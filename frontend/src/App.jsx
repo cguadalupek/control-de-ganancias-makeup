@@ -671,28 +671,28 @@ export default function App() {
 
           {/* SELECTOR DE MES DINÁMICO (Para Resumen General) */}
           {activeTab === 'resumen' && (
-            <div className="flex flex-wrap items-center gap-2 bg-[#fdf2f7] p-2 rounded-2xl border border-[#f9cee3]">
+            <div className="w-full sm:w-auto flex items-center justify-between gap-1.5 sm:gap-2 bg-[#fdf2f7] p-1.5 sm:p-2 rounded-2xl border border-[#f9cee3] flex-nowrap shrink-0 shadow-xs">
               <button
                 onClick={handlePrevDashboardMonth}
-                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
                 title="Mes anterior"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
-              <div className="px-3 py-1 flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
-                <span className="font-extrabold text-sm sm:text-base text-[#1e1e1c] capitalize">
+              <div className="px-2 sm:px-3 py-1 flex items-center justify-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial text-center min-w-0">
+                <CalendarIcon className="w-4 h-4 text-[#ec71a8] shrink-0" />
+                <span className="font-extrabold text-xs sm:text-base text-[#1e1e1c] capitalize whitespace-nowrap truncate">
                   {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
                 </span>
                 {isViewingCurrentMonth ? (
-                  <span className="text-[10px] font-black uppercase bg-[#ec71a8] text-white px-2 py-0.5 rounded-full">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase bg-[#ec71a8] text-white px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                     Mes en curso
                   </span>
                 ) : (
                   <button
                     onClick={handleCurrentDashboardMonth}
-                    className="text-[11px] font-bold text-[#ec71a8] hover:underline cursor-pointer"
+                    className="text-[10px] sm:text-[11px] font-bold text-[#ec71a8] hover:underline cursor-pointer whitespace-nowrap shrink-0"
                   >
                     (Volver a Hoy)
                   </button>
@@ -701,7 +701,7 @@ export default function App() {
 
               <button
                 onClick={handleNextDashboardMonth}
-                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
                 title="Mes siguiente"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -957,15 +957,20 @@ export default function App() {
 
             </div>
 
-            {/* TABLA DE ÚLTIMOS SERVICIOS DEL MES CON ACCESO A EDICIÓN */}
+            {/* TABLA DE ÚLTIMO SERVICIO REGISTRADO DEL MES (SOLO 1 REGISTRO, EL MÁS ACTUAL) */}
             <div className="card-luxury rounded-3xl p-6 sm:p-7">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
-                    Servicios de {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
-                  </h3>
-                  <p className="text-xs text-[#8c8884]">
-                    Haz clic en el botón de lápiz para editar cualquier registro
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
+                      Último Servicio de {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
+                    </h3>
+                    <span className="text-[11px] font-black uppercase bg-[#fce3ed] text-[#ec71a8] px-2.5 py-0.5 rounded-full border border-[#f9cee3]">
+                      Más reciente
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8c8884] mt-0.5">
+                    Mostrando el servicio más reciente del mes. Para ver el historial completo, accede a Informes.
                   </p>
                 </div>
 
@@ -993,7 +998,7 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-[#fce3ed] text-sm bg-white">
                     {monthlyServices.length > 0 ? (
-                      monthlyServices.map((item) => (
+                      monthlyServices.slice(0, 1).map((item) => (
                         <tr key={item.id} className="hover:bg-[#fff5f8] transition-colors">
                           <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
                           <td className="p-3.5 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
@@ -1060,6 +1065,19 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+
+              {/* ENLACE AL HISTORIAL COMPLETO SI HAY MÁS DE UN SERVICIO */}
+              {monthlyServices.length > 1 && (
+                <div className="mt-4 pt-3 border-t border-[#fce3ed] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#6b6764]">
+                  <span>Hay <b>{monthlyServices.length} servicios</b> registrados en este mes.</span>
+                  <button
+                    onClick={() => setActiveTab('informes')}
+                    className="font-extrabold text-[#ec71a8] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    Ver los {monthlyServices.length} servicios en Informes y Edición →
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>
