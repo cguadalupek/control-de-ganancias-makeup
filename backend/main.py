@@ -232,6 +232,57 @@ def registrar_servicio(data: ServicioCreate):
         "entry": new_entry
     }
 
+@app.put("/registro/{id}")
+def actualizar_servicio(id: int, data: ServicioCreate):
+    try:
+        fecha_obj = datetime.datetime.strptime(data.fecha, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Usar YYYY-MM-DD")
+        
+    semana = calcular_semana_mes(fecha_obj)
+    
+    # Normalizar porcentaje
+    pct_decimal = data.porcentaje / 100.0 if data.porcentaje > 1.0 else data.porcentaje
+    pct_display = int(round(pct_decimal * 100))
+    
+    ganancia_personal = round(data.precio * pct_decimal, 2)
+    ganancia_salon = round(data.precio - ganancia_personal, 2)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE registro_servicios 
+        SET fecha = ?, servicio_nombre = ?, precio = ?, porcentaje = ?, 
+            ganancia_personal = ?, ganancia_salon = ?, semana = ?, mes = ?, anio = ?
+        WHERE id = ?
+    """, (data.fecha, data.servicio_nombre.strip(), data.precio, pct_decimal, 
+          ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year, id))
+    updated = cursor.rowcount
+    conn.commit()
+    conn.close()
+    
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+        
+    updated_entry = {
+        "id": id,
+        "date": data.fecha,
+        "week": f"Semana {semana}",
+        "service": data.servicio_nombre.strip(),
+        "price": data.precio,
+        "commission": pct_display,
+        "myGain": ganancia_personal,
+        "salongain": ganancia_salon,
+        "month": fecha_obj.month,
+        "year": fecha_obj.year
+    }
+    
+    return {
+        "status": "ok",
+        "message": "Servicio actualizado correctamente",
+        "entry": updated_entry
+    }
+
 @app.delete("/registro/{id}")
 def eliminar_servicio(id: int):
     conn = get_db()

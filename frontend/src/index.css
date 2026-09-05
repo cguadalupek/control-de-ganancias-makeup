@@ -3,59 +3,116 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand-pink: #ec71a8;
+    --brand-pink-hover: #d95392;
+    --brand-pastel: #f9cee3;
+    --brand-blush: #fce3ed;
+    --brand-cream: #fdebdd;
+    --brand-dark: #1e1e1c;
+    --brand-gold-1: #ecc880;
+    --brand-gold-2: #d4af37;
+    --brand-gold-3: #aa7c11;
+  }
+
   body {
     background-color: #faf5f8;
-    color: #1e293b;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    color: #1e1e1c;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .font-brand-script {
+    font-family: 'Great Vibes', cursive;
+  }
+
+  .font-serif-luxury {
+    font-family: 'Playfair Display', serif;
   }
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #fdf2f7;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: #f4b6d4;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #ec71a8;
 }
 
-/* Neo-brutalism utilities */
-.neo-box {
-  border: 2px solid #0f172a;
-  box-shadow: 4px 4px 0px #0f172a;
-  transition: all 0.15s ease-in-out;
+/* Gradient accents */
+.bg-gradient-gold {
+  background: linear-gradient(135deg, #f7dfa5 0%, #d4af37 50%, #b8860b 100%);
 }
 
-.neo-box-sm {
-  border: 2px solid #0f172a;
-  box-shadow: 2px 2px 0px #0f172a;
-  transition: all 0.15s ease-in-out;
+.text-gradient-gold {
+  background: linear-gradient(135deg, #dfb15b 0%, #b8860b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.neo-box-lg {
-  border: 2px solid #0f172a;
-  box-shadow: 6px 6px 0px #0f172a;
-  transition: all 0.15s ease-in-out;
+.bg-gradient-rose {
+  background: linear-gradient(135deg, #ec71a8 0%, #e04b8f 100%);
 }
 
-.neo-button {
-  border: 2px solid #0f172a;
-  box-shadow: 3px 3px 0px #0f172a;
-  transition: all 0.1s ease-in-out;
-  cursor: pointer;
+.bg-gradient-luxury-dark {
+  background: linear-gradient(135deg, #2b2b29 0%, #1e1e1c 100%);
 }
 
-.neo-button:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px #0f172a;
+.card-luxury {
+  background: #ffffff;
+  border: 1px solid rgba(236, 113, 168, 0.2);
+  box-shadow: 0 10px 25px -5px rgba(236, 113, 168, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.card-luxury:hover {
+  border-color: rgba(236, 113, 168, 0.4);
+  box-shadow: 0 20px 30px -10px rgba(236, 113, 168, 0.15), 0 10px 15px -5px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+/* Smooth modal backdrop animation */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal {
+  animation: modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Pulse glow for notifications */
+@keyframes goldGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+  }
+}
+
+.glow-gold {
+  animation: goldGlow 3s infinite ease-in-out;
+}
+

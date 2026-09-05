@@ -6,7 +6,7 @@ import {
   ChevronRight, 
   Plus, 
   Trash2, 
-  Scissors, 
+  Pencil,
   Sparkles, 
   DollarSign, 
   TrendingUp, 
@@ -24,7 +24,13 @@ import {
   PlusCircle,
   Menu,
   X,
-  ArrowRight
+  ArrowRight,
+  Clock,
+  Award,
+  BarChart3,
+  CalendarDays,
+  SlidersHorizontal,
+  Flame
 } from 'lucide-react';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
@@ -33,12 +39,61 @@ const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '
 
 const DEFAULT_GOAL = 480.00;
 
+// Componente de Logo elegante GUADALUPE MAKE UP Rodriguez
+function BrandLogo({ compact = false }) {
+  return (
+    <div className="flex items-center gap-3 select-none">
+      {/* Emblema con monograma y pincel dorado/rosa */}
+      <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#1e1e1c] via-[#2c2b28] to-[#1e1e1c] p-0.5 shadow-md flex items-center justify-center shrink-0 border border-[#ecc880]/40 group">
+        <div className="w-full h-full rounded-[14px] bg-[#1e1e1c] flex items-center justify-center relative overflow-hidden">
+          {/* Brillo sutil de fondo */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#ec71a8]/20 via-transparent to-[#ecc880]/30 opacity-70"></div>
+          
+          {/* Vector SVG monograma GR estilizado con pincel y corazón */}
+          <svg className="w-8 h-8 text-[#ecc880] relative z-10 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M42 28 C28 28, 22 40, 22 52 C22 66, 32 76, 48 76 C60 76, 68 70, 72 62 L64 58 C60 64, 55 68, 48 68 C37 68, 30 60, 30 52 C30 44, 35 36, 43 36 C52 36, 56 42, 57 48 L65 48 C64 36, 56 28, 42 28 Z" fill="url(#goldGrad)" />
+            <path d="M50 48 H72 C77 48, 80 52, 80 56 C80 61, 76 64, 71 64 L65 64 L74 76 H64 L56 64 H56" stroke="url(#goldGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            {/* Corazón / Detalle de brillo Make Up */}
+            <path d="M74 34 C72 30, 68 30, 66 33 C64 30, 60 30, 58 34 C58 39, 66 45, 66 45 C66 45, 74 39, 74 34 Z" fill="#ec71a8" />
+            <circle cx="78" cy="26" r="2.5" fill="#f9cee3" />
+            <defs>
+              <linearGradient id="goldGrad" x1="20" y1="20" x2="85" y2="85" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#fdf0cd" />
+                <stop offset="0.5" stopColor="#d4af37" />
+                <stop offset="1" stopColor="#aa7c11" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      {!compact && (
+        <div className="flex flex-col">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-extrabold text-lg sm:text-xl tracking-[0.18em] text-[#1e1e1c] uppercase leading-none">
+              Guadalupe
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] font-bold tracking-[0.25em] text-[#6b6764] uppercase">
+              MAKE UP
+            </span>
+            <span className="font-brand-script text-[#ec71a8] text-base sm:text-lg leading-none transform -rotate-3">
+              Rodriguez
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
-  // Estado de navegación activa ('resumen' | 'nuevo_servicio' | 'informes')
+  // Navegación ('resumen' | 'nuevo_servicio' | 'informes')
   const [activeTab, setActiveTab] = useState('resumen');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Estado principal de servicios
+  // Lista de servicios registrados
   const [services, setServices] = useState(() => {
     const saved = localStorage.getItem('salon_services');
     if (saved) {
@@ -48,16 +103,22 @@ export default function App() {
         console.error('Error parsing localStorage', e);
       }
     }
+    // Estado inicial de demostración
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     return [
       {
         id: 1,
-        date: '2026-08-30',
-        week: 'Semana 5',
-        service: 'Maquillaje',
+        date: todayStr,
+        week: 'Semana 1',
+        service: 'Maquillaje Profesional',
         price: 120.00,
         commission: 40,
         myGain: 48.00,
-        salongain: 72.00
+        salongain: 72.00,
+        month: now.getMonth() + 1,
+        year: now.getFullYear()
       }
     ];
   });
@@ -65,23 +126,41 @@ export default function App() {
   // Meta mensual
   const [goalAmount, setGoalAmount] = useState(DEFAULT_GOAL);
 
+  // Gestión de mes en curso para el Dashboard General (Reinicio automático cada nuevo mes)
+  const now = new Date();
+  const [selectedDashboardYear, setSelectedDashboardYear] = useState(now.getFullYear());
+  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState(now.getMonth() + 1); // 1-12
+
   // Formulario nuevo registro
-  const [regDate, setRegDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayYMD = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const [regDate, setRegDate] = useState(todayYMD);
   const [regService, setRegService] = useState('');
   const [regPrice, setRegPrice] = useState('');
   const [regCommission, setRegCommission] = useState(40); // 30 o 40
-  const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Filtros de fecha y búsqueda
+  // Estado para Modal de Edición
+  const [editingService, setEditingService] = useState(null); // Objeto a editar
+  const [editDate, setEditDate] = useState('');
+  const [editService, setEditService] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCommission, setEditCommission] = useState(40);
+
+  // Toast de notificación
+  const [toastMsg, setToastMsg] = useState(null);
+  const showToast = (text, type = 'success') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  // Filtros de fecha y búsqueda (Informes)
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showCalendarWidget, setShowCalendarWidget] = useState(false);
-
-  // Estado del calendario interactivo
   const [calViewDate, setCalViewDate] = useState(() => new Date());
 
-  // Cargar datos iniciales desde Backend si está disponible
+  // Cargar servicios desde backend
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -94,18 +173,18 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.log('Backend no disponible temporalmente, usando almacenamiento local.');
+        console.log('Backend offline o usando fallback local');
       }
     };
     fetchServices();
   }, []);
 
-  // Guardar en localStorage cuando cambian los servicios
+  // Guardar en localStorage
   useEffect(() => {
     localStorage.setItem('salon_services', JSON.stringify(services));
   }, [services]);
 
-  // Función para calcular la semana del mes
+  // Auxiliar semana
   const getWeekOfMonth = (dateString) => {
     const date = new Date(dateString + 'T00:00:00');
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -113,12 +192,17 @@ export default function App() {
     return `Semana ${Math.ceil((date.getDate() + dayOfWeek) / 7)}`;
   };
 
-  // Cálculos en vivo para el formulario
+  // Cálculos en vivo (Nuevo Registro)
   const livePrice = parseFloat(regPrice) || 0;
   const liveMyGain = livePrice * (regCommission / 100);
   const liveSalonGain = livePrice - liveMyGain;
 
-  // Manejo de envío de nuevo servicio
+  // Cálculos en vivo (Modal de Edición)
+  const editLivePrice = parseFloat(editPrice) || 0;
+  const editLiveMyGain = editLivePrice * (editCommission / 100);
+  const editLiveSalonGain = editLivePrice - editLiveMyGain;
+
+  // Envío nuevo servicio
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!regService.trim()) return;
@@ -129,6 +213,10 @@ export default function App() {
     const myGain = Math.round(priceNum * (commNum / 100) * 100) / 100;
     const salongain = Math.round((priceNum - myGain) * 100) / 100;
 
+    const dateObj = new Date(regDate + 'T00:00:00');
+    const sMonth = dateObj.getMonth() + 1;
+    const sYear = dateObj.getFullYear();
+
     const newEntry = {
       id: Date.now(),
       date: regDate,
@@ -137,10 +225,11 @@ export default function App() {
       price: priceNum,
       commission: commNum,
       myGain: myGain,
-      salongain: salongain
+      salongain: salongain,
+      month: sMonth,
+      year: sYear
     };
 
-    // Intentar sincronizar con Backend
     try {
       const res = await fetch(`${API_BASE_URL}/registro`, {
         method: 'POST',
@@ -159,19 +248,75 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.log('Guardado local activado (Backend offline)');
+      console.log('Guardado local activado');
     }
 
     setServices((prev) => [newEntry, ...prev]);
     setRegService('');
     setRegPrice('');
-    setSubmitSuccess(true);
-    setTimeout(() => setSubmitSuccess(false), 5000);
+    showToast('¡Servicio registrado con éxito!', 'success');
+  };
+
+  // Abrir modal de edición
+  const handleOpenEdit = (item) => {
+    setEditingService(item);
+    setEditDate(item.date);
+    setEditService(item.service);
+    setEditPrice(item.price.toString());
+    setEditCommission(item.commission || 40);
+  };
+
+  // Guardar edición de servicio
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingService || !editService.trim()) return;
+    const priceNum = parseFloat(editPrice);
+    if (isNaN(priceNum) || priceNum <= 0) return;
+
+    const commNum = Number(editCommission);
+    const myGain = Math.round(priceNum * (commNum / 100) * 100) / 100;
+    const salongain = Math.round((priceNum - myGain) * 100) / 100;
+
+    const dateObj = new Date(editDate + 'T00:00:00');
+    const sMonth = dateObj.getMonth() + 1;
+    const sYear = dateObj.getFullYear();
+
+    const updatedEntry = {
+      ...editingService,
+      date: editDate,
+      week: getWeekOfMonth(editDate),
+      service: editService.trim(),
+      price: priceNum,
+      commission: commNum,
+      myGain: myGain,
+      salongain: salongain,
+      month: sMonth,
+      year: sYear
+    };
+
+    try {
+      await fetch(`${API_BASE_URL}/registro/${editingService.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha: editDate,
+          servicio_nombre: editService.trim(),
+          precio: priceNum,
+          porcentaje: commNum
+        })
+      });
+    } catch (err) {
+      console.log('Actualizado localmente');
+    }
+
+    setServices((prev) => prev.map((s) => (s.id === editingService.id ? updatedEntry : s)));
+    setEditingService(null);
+    showToast('¡Servicio modificado correctamente!', 'info');
   };
 
   // Eliminar un servicio
   const handleDeleteService = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
+    if (!window.confirm('¿Estás seguro de eliminar este registro de servicio?')) return;
 
     try {
       await fetch(`${API_BASE_URL}/registro/${id}`, { method: 'DELETE' });
@@ -180,12 +325,133 @@ export default function App() {
     }
 
     setServices((prev) => prev.filter((item) => item.id !== id));
+    showToast('Servicio eliminado', 'warning');
   };
+
+  // Nombres de meses en español
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  // Navegar entre meses en el Dashboard
+  const handlePrevDashboardMonth = () => {
+    if (selectedDashboardMonth === 1) {
+      setSelectedDashboardMonth(12);
+      setSelectedDashboardYear(selectedDashboardYear - 1);
+    } else {
+      setSelectedDashboardMonth(selectedDashboardMonth - 1);
+    }
+  };
+
+  const handleNextDashboardMonth = () => {
+    if (selectedDashboardMonth === 12) {
+      setSelectedDashboardMonth(1);
+      setSelectedDashboardYear(selectedDashboardYear + 1);
+    } else {
+      setSelectedDashboardMonth(selectedDashboardMonth + 1);
+    }
+  };
+
+  const handleCurrentDashboardMonth = () => {
+    const cur = new Date();
+    setSelectedDashboardYear(cur.getFullYear());
+    setSelectedDashboardMonth(cur.getMonth() + 1);
+  };
+
+  // ==========================================
+  // DATOS FILTRADOS PARA EL DASHBOARD MENSUAL
+  // ==========================================
+  // Al cambiar de mes o iniciar un nuevo mes, los datos se calculan estrictamente para ese mes
+  // Si no hay registros aún en ese mes, arranca automáticamente en 0.00
+  const monthlyServices = useMemo(() => {
+    return services.filter((item) => {
+      // Comparar por mes y año
+      if (item.month && item.year) {
+        return item.month === selectedDashboardMonth && item.year === selectedDashboardYear;
+      }
+      // Fallback con parsing de fecha YYYY-MM-DD
+      const parts = item.date.split('-');
+      if (parts.length === 3) {
+        const itemYear = parseInt(parts[0], 10);
+        const itemMonth = parseInt(parts[1], 10);
+        return itemYear === selectedDashboardYear && itemMonth === selectedDashboardMonth;
+      }
+      return false;
+    });
+  }, [services, selectedDashboardMonth, selectedDashboardYear]);
+
+  // Totales del Dashboard Mensual
+  const monthMyGain = monthlyServices.reduce((acc, curr) => acc + curr.myGain, 0);
+  const monthSalonGain = monthlyServices.reduce((acc, curr) => acc + curr.salongain, 0);
+  const monthFacturado = monthlyServices.reduce((acc, curr) => acc + curr.price, 0);
+  const monthRemainingGoal = Math.max(0, goalAmount - monthMyGain);
+  const monthGoalProgressPct = Math.min(100, Math.round((monthMyGain / goalAmount) * 100));
+
+  // Desglose semanal del mes (Semana 1 a 5)
+  const weeklyEarnings = useMemo(() => {
+    const weeks = { 'Semana 1': 0, 'Semana 2': 0, 'Semana 3': 0, 'Semana 4': 0, 'Semana 5': 0 };
+    monthlyServices.forEach((s) => {
+      const w = s.week || getWeekOfMonth(s.date);
+      if (weeks[w] !== undefined) {
+        weeks[w] += s.myGain;
+      }
+    });
+    return weeks;
+  }, [monthlyServices]);
+
+  // Desglose por comisiones en el mes
+  const count40 = monthlyServices.filter((s) => s.commission === 40).length;
+  const gain40 = monthlyServices.filter((s) => s.commission === 40).reduce((acc, curr) => acc + curr.myGain, 0);
+  const count30 = monthlyServices.filter((s) => s.commission === 30).length;
+  const gain30 = monthlyServices.filter((s) => s.commission === 30).reduce((acc, curr) => acc + curr.myGain, 0);
+  const ticketPromedio = monthlyServices.length > 0 ? monthFacturado / monthlyServices.length : 0;
+
+  const isViewingCurrentMonth = (now.getMonth() + 1 === selectedDashboardMonth) && (now.getFullYear() === selectedDashboardYear);
+
+  // ==========================================
+  // FILTRADO PARA LA PESTAÑA INFORMES
+  // ==========================================
+  const filteredServices = useMemo(() => {
+    return services.filter((item) => {
+      const matchFrom = filterFrom ? item.date >= filterFrom : true;
+      const matchTo = filterTo ? item.date <= filterTo : true;
+      const matchSearch = searchTerm.trim() 
+        ? item.service.toLowerCase().includes(searchTerm.toLowerCase())
+        : true;
+      return matchFrom && matchTo && matchSearch;
+    });
+  }, [services, filterFrom, filterTo, searchTerm]);
+
+  // Paginación en la sección de Informes e Historial (5 registros por página)
+  const [reportPage, setReportPage] = useState(1);
+  const itemsPerPage = 5;
+
+  // Reiniciar a la primera página cuando cambian los filtros de búsqueda o fecha
+  useEffect(() => {
+    setReportPage(1);
+  }, [filterFrom, filterTo, searchTerm]);
+
+  const totalReportPages = Math.max(1, Math.ceil(filteredServices.length / itemsPerPage));
+  const paginatedServices = useMemo(() => {
+    const start = (reportPage - 1) * itemsPerPage;
+    return filteredServices.slice(start, start + itemsPerPage);
+  }, [filteredServices, reportPage, itemsPerPage]);
+
+  const reportTotalMyGain = filteredServices.reduce((acc, curr) => acc + curr.myGain, 0);
+  const reportTotalSalonGain = filteredServices.reduce((acc, curr) => acc + curr.salongain, 0);
+  const reportTotalFacturado = filteredServices.reduce((acc, curr) => acc + curr.price, 0);
+
+  // Fechas con servicios
+  const datesWithServices = useMemo(() => {
+    const set = new Set();
+    services.forEach((s) => set.add(s.date));
+    return set;
+  }, [services]);
 
   // Atajos rápidos de filtro
   const handleQuickFilter = (type) => {
     const today = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
     const toYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
     if (type === 'today') {
@@ -194,7 +460,7 @@ export default function App() {
       setFilterTo(todayStr);
     } else if (type === 'week') {
       const day = today.getDay();
-      const diff = today.getDate() - day + (day === 0 ? -6 : 1); // lunes
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(today.setDate(diff));
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
@@ -216,40 +482,7 @@ export default function App() {
     }
   };
 
-  // Filtrado de servicios
-  const filteredServices = useMemo(() => {
-    return services.filter((item) => {
-      const matchFrom = filterFrom ? item.date >= filterFrom : true;
-      const matchTo = filterTo ? item.date <= filterTo : true;
-      const matchSearch = searchTerm.trim() 
-        ? item.service.toLowerCase().includes(searchTerm.toLowerCase())
-        : true;
-      return matchFrom && matchTo && matchSearch;
-    });
-  }, [services, filterFrom, filterTo, searchTerm]);
-
-  // Fechas con servicios para marcar en el calendario
-  const datesWithServices = useMemo(() => {
-    const set = new Set();
-    services.forEach((s) => set.add(s.date));
-    return set;
-  }, [services]);
-
-  // Totales y métricas del dashboard
-  const totalMyGain = filteredServices.reduce((acc, curr) => acc + curr.myGain, 0);
-  const totalSalonGain = filteredServices.reduce((acc, curr) => acc + curr.salongain, 0);
-  const totalFacturado = filteredServices.reduce((acc, curr) => acc + curr.price, 0);
-  const remainingGoal = Math.max(0, goalAmount - totalMyGain);
-  const goalProgressPct = Math.min(100, Math.round((totalMyGain / goalAmount) * 100));
-
-  // Desglose por tipo de comisión (30% vs 40%)
-  const count40 = filteredServices.filter((s) => s.commission === 40).length;
-  const gain40 = filteredServices.filter((s) => s.commission === 40).reduce((acc, curr) => acc + curr.myGain, 0);
-  const count30 = filteredServices.filter((s) => s.commission === 30).length;
-  const gain30 = filteredServices.filter((s) => s.commission === 30).reduce((acc, curr) => acc + curr.myGain, 0);
-  const ticketPromedio = filteredServices.length > 0 ? totalFacturado / filteredServices.length : 0;
-
-  // Lógica del Mini Calendario Interactivo
+  // Mini Calendario
   const currentMonthYearStr = calViewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
   const calendarDays = useMemo(() => {
@@ -265,7 +498,6 @@ export default function App() {
     for (let i = 0; i < startDayOfWeek; i++) {
       days.push(null);
     }
-    const pad = (n) => String(n).padStart(2, '0');
     for (let d = 1; d <= lastDay.getDate(); d++) {
       const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
       days.push({
@@ -294,218 +526,299 @@ export default function App() {
     }
   };
 
-  const handlePrevMonth = () => {
-    setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1));
-  };
-
   return (
-    <div className="min-h-screen bg-[#faf5f8] text-slate-900 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#faf5f8] text-[#1e1e1c] flex flex-col md:flex-row antialiased">
       
-      {/* ================= PANEL LATERAL (SIDEBAR) ================= */}
-      <aside className="w-full md:w-72 bg-white border-r-0 md:border-r-3 border-b-3 md:border-b-0 border-black p-5 flex flex-col justify-between shrink-0 shadow-[4px_0px_0px_rgba(0,0,0,0.05)] z-20">
-        <div>
-          {/* LOGO Y NOMBRE DEL APLICATIVO */}
-          <div className="flex items-center justify-between md:justify-start gap-3 pb-6 border-b-2 border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-[#d81b60] text-white rounded-xl border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000]">
-                <Scissors className="w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-black tracking-tight text-[#d81b60]">
-                  Make APP
-                </h1>
-                <span className="bg-[#fce4ec] text-[#d81b60] font-bold text-[11px] px-2 py-0.5 rounded-full border border-black inline-block">
-                  Control de Ganancias
-                </span>
-              </div>
-            </div>
+      {/* TOAST FLOTANTE DE NOTIFICACIONES */}
+      {toastMsg && (
+        <div className="fixed top-5 right-5 z-50 animate-modal flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border border-white/60 backdrop-blur-md bg-[#1e1e1c] text-white font-bold text-sm">
+          <Sparkles className="w-5 h-5 text-[#ecc880] animate-pulse" />
+          <span>{toastMsg.text}</span>
+        </div>
+      )}
 
+      {/* ================= PANEL LATERAL (SIDEBAR) ================= */}
+      <aside className="w-full md:w-80 bg-white/95 backdrop-blur-md border-r border-[#ec71a8]/20 p-6 flex flex-col justify-between shrink-0 shadow-sm z-20">
+        <div>
+          {/* CABECERA CON LOGO PRINCIPAL */}
+          <div className="flex items-center justify-between md:justify-start pb-6 border-b border-[#fce3ed]">
+            <BrandLogo />
             {/* BOTÓN MENÚ MÓVIL */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl border-2 border-black bg-slate-100 shadow-[2px_2px_0px_#000]"
+              className="md:hidden p-2.5 rounded-xl border border-[#ec71a8]/30 bg-[#fce3ed]/50 text-[#1e1e1c]"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
 
-          {/* BOTONES DE NAVEGACIÓN PRINCIPALES (PANEL LATERAL) */}
-          <nav className={`mt-6 flex-col gap-3 ${mobileMenuOpen ? 'flex' : 'hidden md:flex'}`}>
+          {/* INSIGNIA DE ESTILO */}
+          <div className="mt-4 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#fce3ed] via-[#fdf2f7] to-[#fdebdd] border border-[#f9cee3] flex items-center justify-between">
+            <span className="text-[11px] font-bold tracking-wider uppercase text-[#1e1e1c] flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#ec71a8]" />
+              Control de Ganancias
+            </span>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#ec71a8] text-white shadow-xs">
+              PRO
+            </span>
+          </div>
+
+          {/* MENÚ DE NAVEGACIÓN */}
+          <nav className={`mt-6 flex-col gap-2.5 ${mobileMenuOpen ? 'flex' : 'hidden md:flex'}`}>
             
-            {/* BOTÓN 1: RESUMEN */}
+            {/* 1. RESUMEN */}
             <button
               onClick={() => { setActiveTab('resumen'); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl border-2 border-black font-extrabold text-base text-left transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'resumen'
-                  ? 'bg-[#d81b60] text-white shadow-[4px_4px_0px_#000] translate-x-0.5'
-                  : 'bg-white text-slate-700 hover:bg-pink-50 shadow-[2px_2px_0px_#000]'
+                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
+                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
               }`}
             >
-              <LayoutDashboard className={`w-5 h-5 ${activeTab === 'resumen' ? 'text-white' : 'text-[#d81b60]'}`} />
-              <span>Resumen</span>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'resumen' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                <LayoutDashboard className="w-4 h-4" />
+              </div>
+              <div className="text-left flex-1">
+                <span className="block font-extrabold">Resumen General</span>
+                <span className={`text-[11px] block font-medium ${activeTab === 'resumen' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                  Métricas del mes en curso
+                </span>
+              </div>
             </button>
 
-            {/* BOTÓN 2: NUEVO REGISTRO DE SERVICIO */}
+            {/* 2. NUEVO REGISTRO */}
             <button
               onClick={() => { setActiveTab('nuevo_servicio'); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl border-2 border-black font-extrabold text-base text-left transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'nuevo_servicio'
-                  ? 'bg-[#d81b60] text-white shadow-[4px_4px_0px_#000] translate-x-0.5'
-                  : 'bg-white text-slate-700 hover:bg-pink-50 shadow-[2px_2px_0px_#000]'
+                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
+                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
               }`}
             >
-              <PlusCircle className={`w-5 h-5 ${activeTab === 'nuevo_servicio' ? 'text-white' : 'text-[#d81b60]'}`} />
-              <span>Nuevo Registro de Servicio</span>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'nuevo_servicio' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                <PlusCircle className="w-4 h-4" />
+              </div>
+              <div className="text-left flex-1">
+                <span className="block font-extrabold">Registrar Servicio</span>
+                <span className={`text-[11px] block font-medium ${activeTab === 'nuevo_servicio' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                  Ingreso rápido & cálculo
+                </span>
+              </div>
             </button>
 
-            {/* BOTÓN 3: INFORMES */}
+            {/* 3. INFORMES */}
             <button
               onClick={() => { setActiveTab('informes'); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl border-2 border-black font-extrabold text-base text-left transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'informes'
-                  ? 'bg-[#d81b60] text-white shadow-[4px_4px_0px_#000] translate-x-0.5'
-                  : 'bg-white text-slate-700 hover:bg-pink-50 shadow-[2px_2px_0px_#000]'
+                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
+                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
               }`}
             >
-              <FileText className={`w-5 h-5 ${activeTab === 'informes' ? 'text-white' : 'text-[#d81b60]'}`} />
-              <span>Informes</span>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'informes' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="text-left flex-1">
+                <span className="block font-extrabold">Informes & Edición</span>
+                <span className={`text-[11px] block font-medium ${activeTab === 'informes' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                  Historial, filtros y cambios
+                </span>
+              </div>
             </button>
 
           </nav>
         </div>
 
         {/* PIE DEL PANEL LATERAL */}
-        <div className="hidden md:block pt-6 border-t-2 border-slate-100 mt-6 text-xs text-slate-500 font-medium">
-          <p className="font-bold text-slate-700">Make APP v2.0</p>
-          <p>Gestión inteligente de comisiones y servicios</p>
+        <div className="hidden md:block pt-6 border-t border-[#fce3ed] mt-6">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1e1e1c] to-[#2c2b28] text-white relative overflow-hidden shadow-md">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#ec71a8]/20 rounded-full blur-xl"></div>
+            <div className="flex items-center gap-2 text-[#ecc880] mb-1">
+              <Award className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Meta Mensual</span>
+            </div>
+            <div className="text-xl font-black text-white">
+              S/ {goalAmount.toFixed(2)}
+            </div>
+            <p className="text-[11px] text-slate-300 mt-1">
+              {monthRemainingGoal > 0 ? `Faltan S/ ${monthRemainingGoal.toFixed(2)} este mes` : '¡Objetivo alcanzado! ✨'}
+            </p>
+          </div>
         </div>
       </aside>
 
-      {/* ================= CONTENIDO PRINCIPAL SEGÚN BOTÓN SELECCIONADO ================= */}
+      {/* ================= CONTENIDO PRINCIPAL ================= */}
       <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto flex flex-col gap-8 overflow-y-auto">
 
-        {/* HEADER DE CABECERA DE LA VISTA */}
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border-2 border-black rounded-2xl p-6 shadow-[6px_6px_0px_#000]">
+        {/* HEADER DE BIENVENIDA Y CONTROL DE MES */}
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-3xl p-6 sm:p-7 shadow-sm">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-              {activeTab === 'resumen' && 'Resumen General del Dashboard'}
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#ec71a8] mb-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              Sistema de Gestión
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1e1e1c] tracking-tight">
+              {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
               {activeTab === 'nuevo_servicio' && 'Nuevo Registro de Servicio'}
-              {activeTab === 'informes' && 'Informes y Reportes'}
+              {activeTab === 'informes' && 'Historial, Edición e Informes'}
             </h2>
-            <p className="text-sm text-slate-600 font-medium mt-1">
-              {activeTab === 'resumen' && 'Vista global de comisiones, métricas principales y meta del mes.'}
-              {activeTab === 'nuevo_servicio' && 'Ingresa los datos del nuevo servicio realizado y calcula la ganancia.'}
-              {activeTab === 'informes' && 'Filtro por rango de calendario, categorización por comisión e historial.'}
+            <p className="text-sm text-[#6b6764] font-medium mt-1">
+              {activeTab === 'resumen' && 'El panel se actualiza automáticamente al inicio de cada mes.'}
+              {activeTab === 'nuevo_servicio' && 'Calcula comisiones y distribuye la ganancia al instante.'}
+              {activeTab === 'informes' && 'Consulta cualquier rango de fechas, edita o elimina servicios registrados.'}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold bg-[#fce4ec] text-[#d81b60] px-3.5 py-1.5 rounded-xl border border-black shadow-[2px_2px_0px_#000]">
-              {services.length} {services.length === 1 ? 'registro' : 'registros en total'}
-            </span>
-          </div>
+          {/* SELECTOR DE MES DINÁMICO (Para Resumen General) */}
+          {activeTab === 'resumen' && (
+            <div className="flex flex-wrap items-center gap-2 bg-[#fdf2f7] p-2 rounded-2xl border border-[#f9cee3]">
+              <button
+                onClick={handlePrevDashboardMonth}
+                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer"
+                title="Mes anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="px-3 py-1 flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
+                <span className="font-extrabold text-sm sm:text-base text-[#1e1e1c] capitalize">
+                  {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
+                </span>
+                {isViewingCurrentMonth ? (
+                  <span className="text-[10px] font-black uppercase bg-[#ec71a8] text-white px-2 py-0.5 rounded-full">
+                    Mes en curso
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleCurrentDashboardMonth}
+                    className="text-[11px] font-bold text-[#ec71a8] hover:underline cursor-pointer"
+                  >
+                    (Volver a Hoy)
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleNextDashboardMonth}
+                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer"
+                title="Mes siguiente"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {activeTab !== 'resumen' && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
+                {services.length} {services.length === 1 ? 'servicio registrado' : 'servicios registrados'}
+              </span>
+            </div>
+          )}
         </header>
 
-        {/* ================= VISTA 1: RESUMEN ================= */}
+        {/* ================= VISTA 1: RESUMEN GENERAL (REINICIO A CERO CADA MES) ================= */}
         {activeTab === 'resumen' && (
-          <div className="flex flex-col gap-8 animate-in fade-in duration-200">
+          <div className="flex flex-col gap-8 animate-in fade-in duration-300">
             
-            {/* METRICAS PRINCIPALES DEL RESUMEN */}
+            {/* TARJETAS PRINCIPALES DEL MES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
-              {/* 1. MI GANANCIA NETA */}
-              <div className="bg-gradient-to-br from-[#fff0f6] to-white border-3 border-black border-l-[12px] border-l-[#d81b60] rounded-2xl p-6 shadow-[6px_6px_0px_#000] flex flex-col justify-between">
+              {/* 1. MI GANANCIA NETA DEL MES */}
+              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#ec71a8]/15 to-transparent rounded-full blur-2xl"></div>
                 <div className="flex justify-between items-start">
-                  <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#d81b60] bg-pink-100 px-2.5 py-1 rounded-md border border-pink-300">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#ec71a8] bg-[#fce3ed] px-3 py-1 rounded-lg border border-[#f9cee3]">
                     Mi Ganancia Neta
                   </span>
-                  <div className="w-10 h-10 rounded-xl bg-pink-100 border border-pink-300 flex items-center justify-center text-[#d81b60]">
-                    <DollarSign className="w-6 h-6 stroke-[2.5]" />
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/30">
+                    <DollarSign className="w-5 h-5 stroke-[2.5]" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="text-4xl sm:text-5xl font-black text-[#d81b60] tracking-tight">
-                    S/ {totalMyGain.toFixed(2)}
+                <div className="mt-5">
+                  <div className="text-4xl sm:text-5xl font-black text-[#1e1e1c] tracking-tight">
+                    S/ {monthMyGain.toFixed(2)}
                   </div>
-                  <div className="mt-2 text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full bg-[#d81b60]"></span>
-                    {goalProgressPct}% alcanzado de la meta
+                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ec71a8]"></span>
+                    {monthGoalProgressPct}% alcanzado de la meta mensual
                   </div>
                 </div>
               </div>
 
-              {/* 2. GANANCIA SALÓN */}
-              <div className="bg-gradient-to-br from-[#f5f3ff] to-white border-3 border-black border-l-[12px] border-l-[#6366f1] rounded-2xl p-6 shadow-[6px_6px_0px_#000] flex flex-col justify-between">
+              {/* 2. GANANCIA SALÓN DEL MES */}
+              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
                 <div className="flex justify-between items-start">
-                  <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#4f46e5] bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-300">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#6b6764] bg-[#f5f3ef] px-3 py-1 rounded-lg border border-[#e5e1da]">
                     Ganancia Salón
                   </span>
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-300 flex items-center justify-center text-[#4f46e5]">
-                    <Store className="w-6 h-6" />
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#1e1e1c] to-[#3a3936] text-[#ecc880] flex items-center justify-center shadow-md">
+                    <Store className="w-5 h-5" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="text-3xl sm:text-4xl font-extrabold text-[#312e81] tracking-tight">
-                    S/ {totalSalonGain.toFixed(2)}
+                <div className="mt-5">
+                  <div className="text-3xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight">
+                    S/ {monthSalonGain.toFixed(2)}
                   </div>
-                  <div className="mt-2 text-xs font-semibold text-slate-600">
-                    Total retenido para local y costos
+                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764]">
+                    Local, insumos y mantenimiento
                   </div>
                 </div>
               </div>
 
-              {/* 3. TOTAL FACTURADO */}
-              <div className="bg-gradient-to-br from-[#f0fdf4] to-white border-3 border-black border-l-[12px] border-l-[#10b981] rounded-2xl p-6 shadow-[6px_6px_0px_#000] flex flex-col justify-between">
+              {/* 3. TOTAL FACTURADO EN EL MES */}
+              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
                 <div className="flex justify-between items-start">
-                  <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#059669] bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-300">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#b8860b] bg-[#fdebdd] px-3 py-1 rounded-lg border border-[#edd5b6]">
                     Total Facturado
                   </span>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-[#059669]">
-                    <TrendingUp className="w-6 h-6" />
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-gold text-white flex items-center justify-center shadow-md shadow-[#d4af37]/30">
+                    <TrendingUp className="w-5 h-5 stroke-[2.5]" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="text-3xl sm:text-4xl font-extrabold text-[#064e3b] tracking-tight">
-                    S/ {totalFacturado.toFixed(2)}
+                <div className="mt-5">
+                  <div className="text-3xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight">
+                    S/ {monthFacturado.toFixed(2)}
                   </div>
-                  <div className="mt-2 text-xs font-semibold text-slate-600">
-                    Facturación bruta acumulada
+                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764]">
+                    {monthlyServices.length} {monthlyServices.length === 1 ? 'servicio en el mes' : 'servicios en el mes'}
                   </div>
                 </div>
               </div>
 
-              {/* 4. META MENSUAL */}
-              <div className="bg-gradient-to-br from-[#fffbeb] to-white border-3 border-black border-l-[12px] border-l-[#f59e0b] rounded-2xl p-6 shadow-[6px_6px_0px_#000] flex flex-col justify-between">
+              {/* 4. META DEL MES CON BARRA DE PROGRESO */}
+              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
                 <div className="flex justify-between items-start">
-                  <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#d97706] bg-amber-100 px-2.5 py-1 rounded-md border border-amber-300">
-                    Meta (S/ {goalAmount.toFixed(0)})
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#ec71a8] bg-[#fce3ed] px-3 py-1 rounded-lg border border-[#f9cee3]">
+                    Meta ({monthNames[selectedDashboardMonth - 1]})
                   </span>
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-[#d97706]">
-                    <Target className="w-6 h-6" />
+                  <div className="w-11 h-11 rounded-2xl bg-[#fdebdd] border border-[#d4af37]/40 text-[#b8860b] flex items-center justify-center">
+                    <Target className="w-5 h-5" />
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex items-baseline justify-between">
-                    <div className="text-2xl sm:text-3xl font-extrabold text-[#78350f]">
-                      {remainingGoal > 0 ? `Faltan S/ ${remainingGoal.toFixed(2)}` : '¡Meta Cumplida! 🎉'}
-                    </div>
+                <div className="mt-5">
+                  <div className="text-2xl sm:text-3xl font-black text-[#1e1e1c]">
+                    {monthRemainingGoal > 0 ? (
+                      <span>Faltan S/ {monthRemainingGoal.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-[#ec71a8] flex items-center gap-1.5">
+                        ¡Meta Cumplida! <Sparkles className="w-5 h-5 text-[#ecc880]" />
+                      </span>
+                    )}
                   </div>
 
-                  <div className="mt-3 w-full bg-slate-200 h-3 rounded-full overflow-hidden border border-black">
+                  <div className="mt-3.5 w-full bg-[#fce3ed] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#f9cee3]">
                     <div 
-                      className="bg-gradient-to-r from-[#f59e0b] to-[#d81b60] h-full transition-all duration-500 rounded-full"
-                      style={{ width: `${goalProgressPct}%` }}
+                      className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#d4af37] via-[#ec71a8] to-[#d95392]"
+                      style={{ width: `${monthGoalProgressPct}%` }}
                     ></div>
                   </div>
 
-                  <div className="mt-1.5 flex justify-between text-[11px] font-bold text-slate-500">
-                    <span>S/ 0</span>
-                    <span>{goalProgressPct}%</span>
+                  <div className="mt-2 flex justify-between text-[11px] font-bold text-[#8c8884]">
+                    <span>S/ 0.00</span>
+                    <span className="text-[#ec71a8] font-extrabold">{monthGoalProgressPct}%</span>
                     <span>S/ {goalAmount.toFixed(0)}</span>
                   </div>
                 </div>
@@ -513,123 +826,265 @@ export default function App() {
 
             </div>
 
-            {/* TARJETAS DE DESGLOSE DE CATEGORÍAS Y PROMEDIO */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* SECCIÓN DINÁMICA: EVOLUCIÓN SEMANAL & DESGLOSE POR COMISIÓN */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-pink-100 border-2 border-pink-400 text-[#d81b60] font-black flex items-center justify-center text-base">
-                    40%
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-500 uppercase">Servicios al 40%</div>
-                    <div className="text-xl font-black text-slate-900">
-                      S/ {gain40.toFixed(2)} <span className="text-xs font-semibold text-slate-500">({count40} serv.)</span>
+              {/* RENDIMIENTO SEMANAL (SEMANAS 1 A 5) */}
+              <div className="card-luxury rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center">
+                        <BarChart3 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-base sm:text-lg text-[#1e1e1c]">
+                          Rendimiento por Semanas - {monthNames[selectedDashboardMonth - 1]}
+                        </h3>
+                        <p className="text-xs text-[#8c8884]">Distribución de tu ganancia neta durante el mes</p>
+                      </div>
                     </div>
+                    <span className="text-xs font-bold text-[#ec71a8] bg-[#fce3ed] px-3 py-1 rounded-xl">
+                      {monthlyServices.length} servicios
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end h-44 pt-4 pb-2">
+                    {Object.entries(weeklyEarnings).map(([weekName, amount]) => {
+                      const maxPossible = Math.max(...Object.values(weeklyEarnings), 150);
+                      const heightPercent = Math.min(100, Math.max(12, Math.round((amount / maxPossible) * 100)));
+                      
+                      return (
+                        <div key={weekName} className="flex flex-col items-center gap-2 h-full justify-end group">
+                          <span className="text-[11px] font-extrabold text-[#1e1e1c] group-hover:text-[#ec71a8] transition-colors">
+                            S/ {amount.toFixed(0)}
+                          </span>
+                          <div className="w-full max-w-[48px] bg-[#fce3ed] rounded-2xl overflow-hidden p-1 flex flex-col justify-end border border-[#f9cee3]/50 h-32">
+                            <div 
+                              className={`w-full rounded-xl transition-all duration-500 ${
+                                amount > 0 
+                                  ? 'bg-gradient-to-t from-[#ec71a8] to-[#f9cee3] shadow-sm' 
+                                  : 'bg-transparent'
+                              }`}
+                              style={{ height: `${heightPercent}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-[11px] font-bold text-[#8c8884] group-hover:text-[#1e1e1c] whitespace-nowrap">
+                            {weekName.replace('Semana ', 'Sem ')}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <span className="text-xs font-extrabold bg-pink-50 text-[#d81b60] px-2.5 py-1 rounded-md border border-pink-200">
-                  Principal
-                </span>
+
+                <div className="mt-4 pt-3 border-t border-[#fce3ed] flex items-center justify-between text-xs text-[#6b6764]">
+                  <span>Semana promedio: <b>S/ {(monthMyGain / 5).toFixed(2)}</b></span>
+                  <span className="text-[#ec71a8] font-bold">Total Mes: S/ {monthMyGain.toFixed(2)}</span>
+                </div>
               </div>
 
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-100 border-2 border-indigo-400 text-indigo-700 font-black flex items-center justify-center text-base">
-                    30%
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-500 uppercase">Servicios al 30%</div>
-                    <div className="text-xl font-black text-slate-900">
-                      S/ {gain30.toFixed(2)} <span className="text-xs font-semibold text-slate-500">({count30} serv.)</span>
+              {/* DESGLOSE POR TIPO DE COMISIÓN */}
+              <div className="card-luxury rounded-3xl p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5 border-b border-[#fce3ed] pb-4 mb-5">
+                    <div className="w-9 h-9 rounded-xl bg-[#fdebdd] text-[#b8860b] flex items-center justify-center">
+                      <Percent className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-[#1e1e1c]">
+                        Comisiones del Mes
+                      </h3>
+                      <p className="text-xs text-[#8c8884]">40% estándar vs 30% salón</p>
                     </div>
                   </div>
-                </div>
-                <span className="text-xs font-extrabold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-200">
-                  Especial
-                </span>
-              </div>
 
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 border-2 border-emerald-400 text-emerald-700 font-black flex items-center justify-center text-base">
-                    AVG
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-500 uppercase">Ticket Promedio</div>
-                    <div className="text-xl font-black text-slate-900">
-                      S/ {ticketPromedio.toFixed(2)} <span className="text-xs font-semibold text-slate-500">/ serv.</span>
+                  <div className="flex flex-col gap-4">
+                    {/* Tarjeta 40% */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-[#fce3ed]/70 to-[#fff5f8] border border-[#f9cee3] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#ec71a8] text-white font-black text-sm flex items-center justify-center shadow-xs">
+                          40%
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#6b6764]">Servicios al 40%</div>
+                          <div className="text-lg font-black text-[#1e1e1c]">
+                            S/ {gain40.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold bg-white text-[#ec71a8] px-2.5 py-1 rounded-xl border border-[#f9cee3] shadow-2xs">
+                        {count40} serv.
+                      </span>
+                    </div>
+
+                    {/* Tarjeta 30% */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-[#f5f3ef] to-white border border-[#e5e1da] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#1e1e1c] text-[#ecc880] font-black text-sm flex items-center justify-center shadow-xs">
+                          30%
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#6b6764]">Servicios al 30%</div>
+                          <div className="text-lg font-black text-[#1e1e1c]">
+                            S/ {gain30.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold bg-white text-[#1e1e1c] px-2.5 py-1 rounded-xl border border-[#e5e1da] shadow-2xs">
+                        {count30} serv.
+                      </span>
+                    </div>
+
+                    {/* Ticket Promedio */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#fdebdd]/50 to-white border border-[#edd5b6] flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#6b6764]">Ticket Promedio:</span>
+                      <span className="text-sm font-black text-[#1e1e1c]">
+                        S/ {ticketPromedio.toFixed(2)} / servicio
+                      </span>
                     </div>
                   </div>
                 </div>
-                <span className="text-xs font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200">
-                  Promedio
-                </span>
+
+                <button
+                  onClick={() => setActiveTab('nuevo_servicio')}
+                  className="mt-6 w-full py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Registrar Servicio en este Mes
+                </button>
               </div>
 
             </div>
 
-            {/* VISTA RÁPIDA / ACCESOS DIRECTOS */}
-            <div className="bg-white border-3 border-black rounded-2xl p-6 sm:p-8 shadow-[6px_6px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[#d81b60]" />
-                  ¿Deseas registrar un nuevo servicio o revisar los informes?
-                </h3>
-                <p className="text-sm text-slate-600 mt-1">
-                  Usa el panel lateral para navegar entre la carga de nuevos registros e informes con filtro por rango de fechas.
-                </p>
-              </div>
+            {/* TABLA DE ÚLTIMOS SERVICIOS DEL MES CON ACCESO A EDICIÓN */}
+            <div className="card-luxury rounded-3xl p-6 sm:p-7">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
+                    Servicios de {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
+                  </h3>
+                  <p className="text-xs text-[#8c8884]">
+                    Haz clic en el botón de lápiz para editar cualquier registro
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  onClick={() => setActiveTab('nuevo_servicio')}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-[#d81b60] hover:bg-[#c2185b] text-white font-extrabold px-5 py-3 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer"
-                >
-                  <Plus className="w-5 h-5" />
-                  Nuevo Registro
-                </button>
                 <button
                   onClick={() => setActiveTab('informes')}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold px-5 py-3 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#fce3ed] text-[#ec71a8] hover:bg-[#f9cee3] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
                 >
-                  Ver Informes
-                  <ArrowRight className="w-4 h-4" />
+                  Ver todos los informes <ArrowRight className="w-3.5 h-3.5" />
                 </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-[#fce3ed]">
+                <table className="w-full text-left border-collapse min-w-[650px]">
+                  <thead>
+                    <tr className="bg-[#1e1e1c] text-white text-[11px] font-black uppercase tracking-wider">
+                      <th className="p-3.5">Fecha</th>
+                      <th className="p-3.5">Semana</th>
+                      <th className="p-3.5">Servicio Realizado</th>
+                      <th className="p-3.5">Cobrado (S/)</th>
+                      <th className="p-3.5">Comisión</th>
+                      <th className="p-3.5">Mi Ganancia</th>
+                      <th className="p-3.5">Ganancia Salón</th>
+                      <th className="p-3.5 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#fce3ed] text-sm bg-white">
+                    {monthlyServices.length > 0 ? (
+                      monthlyServices.map((item) => (
+                        <tr key={item.id} className="hover:bg-[#fff5f8] transition-colors">
+                          <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
+                          <td className="p-3.5 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
+                          <td className="p-3.5 whitespace-nowrap font-extrabold text-[#1e1e1c]">{item.service}</td>
+                          <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${
+                              item.commission === 40
+                                ? 'bg-[#fce3ed] text-[#ec71a8] border-[#f9cee3]'
+                                : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
+                            }`}>
+                              {item.commission}%
+                            </span>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap font-black text-[#ec71a8] text-base">
+                            S/ {item.myGain.toFixed(2)}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap font-semibold text-[#6b6764]">
+                            S/ {item.salongain.toFixed(2)}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* BOTÓN EDITAR */}
+                              <button
+                                onClick={() => handleOpenEdit(item)}
+                                className="p-2 bg-[#fdebdd]/70 hover:bg-[#fdebdd] text-[#b8860b] rounded-xl border border-[#edd5b6] transition-all cursor-pointer shadow-xs hover:scale-105"
+                                title="Editar servicio"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              {/* BOTÓN ELIMINAR */}
+                              <button
+                                onClick={() => handleDeleteService(item.id)}
+                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 transition-all cursor-pointer shadow-xs hover:scale-105"
+                                title="Eliminar servicio"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="p-10 text-center text-[#8c8884]">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Sparkles className="w-8 h-8 text-[#ec71a8]/40" />
+                            <span className="font-extrabold text-[#1e1e1c]">
+                              No hay servicios registrados en {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}.
+                            </span>
+                            <p className="text-xs text-[#8c8884]">
+                              El panel inicia en 0.00 al comenzar cada nuevo mes.
+                            </p>
+                            <button
+                              onClick={() => setActiveTab('nuevo_servicio')}
+                              className="mt-2 text-xs text-white bg-[#ec71a8] px-4 py-2 rounded-xl font-bold hover:bg-[#d95392] cursor-pointer shadow-sm"
+                            >
+                              + Registrar Primer Servicio de Este Mes
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
           </div>
         )}
 
-        {/* ================= VISTA 2: NUEVO REGISTRO DE SERVICIO ================= */}
+        {/* ================= VISTA 2: NUEVO REGISTRO ================= */}
         {activeTab === 'nuevo_servicio' && (
-          <div className="flex flex-col gap-6 animate-in fade-in duration-200">
-            
-            {/* NOTIFICACIÓN DE ÉXITO */}
-            {submitSuccess && (
-              <div className="bg-emerald-50 border-3 border-black rounded-2xl p-4 shadow-[4px_4px_0px_#000] flex items-center justify-between gap-4 text-emerald-900 font-extrabold">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                  <span>¡Servicio registrado exitosamente en Make APP!</span>
+          <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+            <section className="card-luxury rounded-3xl p-6 sm:p-9">
+              <div className="flex items-center justify-between border-b border-[#fce3ed] pb-5 mb-7">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/20">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-[#1e1e1c]">
+                      Registrar Nuevo Servicio
+                    </h3>
+                    <p className="text-xs text-[#8c8884]">
+                      Ingresa los datos para calcular la comisión automáticamente
+                    </p>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setActiveTab('informes')}
-                  className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg border border-black hover:bg-emerald-700 cursor-pointer"
-                >
-                  Ver en Informes →
-                </button>
-              </div>
-            )}
-
-            <section className="bg-white border-3 border-black rounded-2xl p-6 sm:p-8 shadow-[8px_8px_0px_#000]">
-              <div className="flex items-center justify-between border-b-2 border-slate-100 pb-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-[#d81b60]" />
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">Formulario de Registro de Servicio</h3>
-                </div>
-                <span className="text-xs bg-pink-100 text-[#d81b60] px-3 py-1 rounded-full border border-black font-extrabold">
-                  Texto Libre & Comisión
+                <span className="text-xs bg-[#fdebdd] text-[#b8860b] px-3 py-1.5 rounded-full border border-[#edd5b6] font-extrabold">
+                  GUADALUPE MAKE UP
                 </span>
               </div>
 
@@ -638,42 +1093,40 @@ export default function App() {
                   
                   {/* 1. FECHA */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <CalendarIcon className="w-4 h-4 text-[#d81b60]" />
-                      Fecha
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
+                      Fecha del Servicio
                     </label>
                     <input
                       type="date"
                       value={regDate}
                       onChange={(e) => setRegDate(e.target.value)}
-                      className="p-3.5 border-2 border-black rounded-xl text-base font-semibold outline-none focus:ring-2 focus:ring-[#d81b60] bg-slate-50 focus:bg-white transition-all shadow-[2px_2px_0px_#000]"
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     />
                   </div>
 
-                  {/* 2. SERVICIO (CAMPO DE TEXTO LIBRE) */}
-                  <div className="flex flex-col gap-2 sm:col-span-1 lg:col-span-1">
-                    <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Scissors className="w-4 h-4 text-[#d81b60]" />
-                        Servicio Realizado
-                      </span>
+                  {/* 2. NOMBRE DEL SERVICIO */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                      Servicio Realizado
                     </label>
                     <input
                       type="text"
-                      placeholder="Ej. Maquillaje, Alisado, Peinado, Corte..."
+                      placeholder="Ej. Maquillaje Social, Novia, Pestañas..."
                       value={regService}
                       onChange={(e) => setRegService(e.target.value)}
-                      className="p-3.5 border-2 border-black rounded-xl text-base font-semibold outline-none focus:ring-2 focus:ring-[#d81b60] bg-slate-50 focus:bg-white transition-all shadow-[2px_2px_0px_#000]"
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                       autoFocus
                     />
                   </div>
 
-                  {/* 3. PRECIO (S/) */}
+                  {/* 3. PRECIO COBRADO */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-[#d81b60]" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-[#ec71a8]" />
                       Precio Cobrado (S/)
                     </label>
                     <input
@@ -683,42 +1136,42 @@ export default function App() {
                       placeholder="0.00"
                       value={regPrice}
                       onChange={(e) => setRegPrice(e.target.value)}
-                      className="p-3.5 border-2 border-black rounded-xl text-base font-bold outline-none focus:ring-2 focus:ring-[#d81b60] bg-slate-50 focus:bg-white transition-all shadow-[2px_2px_0px_#000]"
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     />
                   </div>
 
                   {/* 4. SELECTOR DE COMISIÓN (30% vs 40%) */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Percent className="w-4 h-4 text-[#d81b60]" />
-                      Comisión (% Ganancia)
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <Percent className="w-4 h-4 text-[#ec71a8]" />
+                      Comisión (% Mi Ganancia)
                     </label>
-                    <div className="grid grid-cols-2 gap-2 h-[52px]">
+                    <div className="grid grid-cols-2 gap-2 h-[48px]">
                       <button
                         type="button"
                         onClick={() => setRegCommission(30)}
-                        className={`flex items-center justify-center gap-1.5 rounded-xl border-2 border-black font-extrabold text-base transition-all cursor-pointer shadow-[2px_2px_0px_#000] ${
+                        className={`flex items-center justify-center gap-1.5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer border ${
                           regCommission === 30
-                            ? 'bg-[#6366f1] text-white ring-2 ring-indigo-900 shadow-[3px_3px_0px_#000]'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-[#1e1e1c] text-[#ecc880] border-[#1e1e1c] shadow-md'
+                            : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
                         }`}
                       >
                         {regCommission === 30 && <Check className="w-4 h-4 stroke-[3]" />}
-                        30%
+                        30% Salón
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setRegCommission(40)}
-                        className={`flex items-center justify-center gap-1.5 rounded-xl border-2 border-black font-extrabold text-base transition-all cursor-pointer shadow-[2px_2px_0px_#000] ${
+                        className={`flex items-center justify-center gap-1.5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer border ${
                           regCommission === 40
-                            ? 'bg-[#d81b60] text-white ring-2 ring-pink-900 shadow-[3px_3px_0px_#000]'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-md shadow-[#ec71a8]/25'
+                            : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
                         }`}
                       >
                         {regCommission === 40 && <Check className="w-4 h-4 stroke-[3]" />}
-                        40%
+                        40% Regular
                       </button>
                     </div>
                   </div>
@@ -727,65 +1180,63 @@ export default function App() {
 
                 {/* VISTA PREVIA DEL CÁLCULO EN VIVO */}
                 {livePrice > 0 && (
-                  <div className="bg-[#fff9fb] border-2 border-[#d81b60] border-dashed rounded-xl p-5 flex flex-wrap items-center justify-between gap-4">
+                  <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-[#d81b60]" />
-                      <span className="font-bold text-sm text-slate-700">Cálculo Automático de Ganancia:</span>
+                      <Sparkles className="w-5 h-5 text-[#ec71a8]" />
+                      <span className="font-extrabold text-sm text-[#1e1e1c]">Cálculo en Tiempo Real:</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-6 text-sm">
                       <div>
-                        <span className="text-slate-500 font-medium">Precio Total: </span>
-                        <span className="font-bold">S/ {livePrice.toFixed(2)}</span>
+                        <span className="text-[#8c8884] font-medium">Total: </span>
+                        <span className="font-extrabold text-[#1e1e1c]">S/ {livePrice.toFixed(2)}</span>
                       </div>
-                      <div className="bg-pink-100 text-[#d81b60] px-3.5 py-1.5 rounded-lg border border-pink-300 font-extrabold">
+                      <div className="bg-[#ec71a8] text-white px-4 py-1.5 rounded-xl font-extrabold shadow-sm">
                         Mi Ganancia ({regCommission}%): S/ {liveMyGain.toFixed(2)}
                       </div>
-                      <div className="bg-indigo-50 text-indigo-900 px-3.5 py-1.5 rounded-lg border border-indigo-200 font-bold">
+                      <div className="bg-[#1e1e1c] text-[#ecc880] px-4 py-1.5 rounded-xl font-bold">
                         Salón ({100 - regCommission}%): S/ {liveSalonGain.toFixed(2)}
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex justify-end gap-3 pt-4">
+                <div className="flex justify-end gap-3 pt-4 border-t border-[#fce3ed]">
                   <button
                     type="button"
                     onClick={() => setActiveTab('resumen')}
-                    className="px-6 py-3.5 rounded-xl border-2 border-black bg-slate-100 hover:bg-slate-200 font-bold text-sm shadow-[2px_2px_0px_#000] cursor-pointer"
+                    className="px-6 py-3.5 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-sm text-[#6b6764] cursor-pointer transition-colors"
                   >
-                    Volver a Resumen
+                    Volver al Panel
                   </button>
                   <button
                     type="submit"
-                    className="px-8 py-3.5 rounded-xl border-2 border-black bg-[#d81b60] hover:bg-[#c2185b] text-white font-extrabold text-base shadow-[4px_4px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer flex items-center gap-2"
+                    className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-[#ec71a8]/25 cursor-pointer flex items-center gap-2 transition-transform active:scale-98"
                   >
                     <CheckCircle2 className="w-5 h-5" />
-                    Guardar Registro
+                    Guardar Registro de Servicio
                   </button>
                 </div>
               </form>
             </section>
-
           </div>
         )}
 
-        {/* ================= VISTA 3: INFORMES ================= */}
+        {/* ================= VISTA 3: INFORMES Y EDICIÓN COMPLETA ================= */}
         {activeTab === 'informes' && (
-          <div className="flex flex-col gap-8 animate-in fade-in duration-200">
+          <div className="flex flex-col gap-8 animate-in fade-in duration-300">
 
-            {/* SECCIÓN DE FILTRO CON CALENDARIO INTERACTIVO */}
-            <section className="bg-white border-3 border-black rounded-2xl p-6 shadow-[6px_6px_0px_#000] flex flex-col gap-6">
-              
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b-2 border-slate-100 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-[#d81b60] text-white flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+            {/* SECCIÓN DE FILTRO CON CALENDARIO */}
+            <section className="card-luxury rounded-3xl p-6 sm:p-7 flex flex-col gap-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#fce3ed] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center">
                     <CalendarRange className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900">
-                      Filtro por Rango de Calendario
+                    <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
+                      Filtro de Rango y Búsqueda
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[#8c8884]">
                       Selecciona un rango de fechas o busca por nombre de servicio
                     </p>
                   </div>
@@ -795,78 +1246,78 @@ export default function App() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleQuickFilter('today')}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-black rounded-lg text-xs font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
                   >
                     Hoy
                   </button>
                   <button
                     onClick={() => handleQuickFilter('week')}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-black rounded-lg text-xs font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
                   >
                     Esta Semana
                   </button>
                   <button
                     onClick={() => handleQuickFilter('month')}
-                    className="px-3 py-1.5 bg-[#fce4ec] text-[#d81b60] hover:bg-[#f8bbd0] border border-black rounded-lg text-xs font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-[#fce3ed] text-[#ec71a8] hover:bg-[#f9cee3] border border-[#f9cee3] rounded-xl text-xs font-black transition-all shadow-2xs cursor-pointer"
                   >
                     Este Mes
                   </button>
                   <button
                     onClick={() => handleQuickFilter('last_month')}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-black rounded-lg text-xs font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
                   >
                     Mes Anterior
                   </button>
                   <button
                     onClick={() => handleQuickFilter('all')}
-                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 border border-black rounded-lg text-xs font-bold transition-all shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-[#f5f3ef] hover:bg-[#e5e1da] border border-[#e5e1da] rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
-                    Todo
+                    Todo el Histórico
                   </button>
                   <button
                     onClick={() => setShowCalendarWidget(!showCalendarWidget)}
-                    className={`px-3 py-1.5 border-2 border-black rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      showCalendarWidget ? 'bg-[#d81b60] text-white shadow-[2px_2px_0px_#000]' : 'bg-pink-100 text-[#d81b60]'
+                    className={`px-3.5 py-2 border rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      showCalendarWidget ? 'bg-[#ec71a8] text-white border-[#ec71a8] shadow-sm' : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
                     }`}
                   >
                     <CalendarIcon className="w-3.5 h-3.5" />
-                    {showCalendarWidget ? 'Ocultar Calendario Visual' : 'Ver Calendario Visual'}
+                    {showCalendarWidget ? 'Ocultar Calendario' : 'Calendario Visual'}
                   </button>
                 </div>
               </div>
 
-              {/* INPUTS DE FECHA DESDE / HASTA Y BUSCADOR */}
+              {/* INPUTS DE FILTRO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5 text-[#d81b60]" />
-                    Fecha Inicio (Desde):
+                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
+                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Fecha Desde:
                   </label>
                   <input
                     type="date"
                     value={filterFrom}
                     onChange={(e) => setFilterFrom(e.target.value)}
-                    className="p-2.5 border-2 border-black rounded-xl text-sm font-semibold outline-none bg-slate-50 focus:bg-white shadow-[2px_2px_0px_#000]"
+                    className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5 text-[#d81b60]" />
-                    Fecha Fin (Hasta):
+                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
+                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Fecha Hasta:
                   </label>
                   <input
                     type="date"
                     value={filterTo}
                     onChange={(e) => setFilterTo(e.target.value)}
-                    className="p-2.5 border-2 border-black rounded-xl text-sm font-semibold outline-none bg-slate-50 focus:bg-white shadow-[2px_2px_0px_#000]"
+                    className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <Search className="w-3.5 h-3.5 text-slate-600" />
-                    Buscar por Servicio:
+                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
+                    <Search className="w-3.5 h-3.5 text-[#8c8884]" />
+                    Buscar Servicio:
                   </label>
                   <div className="relative">
                     <input
@@ -874,12 +1325,12 @@ export default function App() {
                       placeholder="Ej. Maquillaje, Alisado..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full p-2.5 border-2 border-black rounded-xl text-sm font-semibold outline-none bg-slate-50 focus:bg-white shadow-[2px_2px_0px_#000]"
+                      className="w-full p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                     />
                     {searchTerm && (
                       <button 
                         onClick={() => setSearchTerm('')}
-                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-700 text-xs font-bold"
+                        className="absolute right-3 top-3 text-[#8c8884] hover:text-[#1e1e1c] text-xs font-bold cursor-pointer"
                       >
                         ✕
                       </button>
@@ -891,7 +1342,7 @@ export default function App() {
                   {(filterFrom || filterTo || searchTerm) && (
                     <button
                       onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); }}
-                      className="w-full p-2.5 bg-slate-200 hover:bg-slate-300 border-2 border-black rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                      className="w-full p-3 bg-[#fce3ed] hover:bg-[#f9cee3] text-[#ec71a8] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Limpiar Filtros
@@ -900,30 +1351,29 @@ export default function App() {
                 </div>
               </div>
 
-              {/* WIDGET DE CALENDARIO VISUAL INTERACTIVO */}
+              {/* CALENDARIO VISUAL INTERACTIVO */}
               {showCalendarWidget && (
-                <div className="bg-[#fff9fb] border-2 border-black rounded-2xl p-5 shadow-[4px_4px_0px_#000] animate-in fade-in duration-150">
+                <div className="bg-[#fff9fb] border border-[#f9cee3] rounded-3xl p-5 shadow-inner animate-modal">
                   <div className="flex items-center justify-between mb-4">
                     <button
-                      onClick={handlePrevMonth}
-                      className="p-2 bg-white border border-black rounded-lg hover:bg-slate-100 shadow-[2px_2px_0px_#000] cursor-pointer"
+                      onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1))}
+                      className="p-2 bg-white border border-[#f9cee3] rounded-xl hover:bg-[#fce3ed] cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <div className="text-base font-extrabold capitalize text-slate-800 flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4 text-[#d81b60]" />
+                    <div className="text-base font-extrabold capitalize text-[#1e1e1c] flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
                       {currentMonthYearStr}
                     </div>
                     <button
-                      onClick={handleNextMonth}
-                      className="p-2 bg-white border border-black rounded-lg hover:bg-slate-100 shadow-[2px_2px_0px_#000] cursor-pointer"
+                      onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1))}
+                      className="p-2 bg-white border border-[#f9cee3] rounded-xl hover:bg-[#fce3ed] cursor-pointer"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* DÍAS DE LA SEMANA */}
-                  <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-black text-slate-500 mb-2 uppercase">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[11px] font-black text-[#8c8884] mb-2 uppercase">
                     <span>Lun</span>
                     <span>Mar</span>
                     <span>Mié</span>
@@ -933,139 +1383,93 @@ export default function App() {
                     <span>Dom</span>
                   </div>
 
-                  {/* GRILLA DE DÍAS */}
                   <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center">
                     {calendarDays.map((day, idx) => {
-                      if (!day) {
-                        return <div key={`empty-${idx}`} className="h-10 sm:h-12"></div>;
-                      }
+                      if (!day) return <div key={`empty-${idx}`} className="h-10 sm:h-11"></div>;
 
-                      let bgClass = "bg-white hover:bg-pink-50 text-slate-800 border-slate-200";
+                      let bgClass = "bg-white hover:bg-[#fce3ed]/50 text-[#1e1e1c] border-[#fce3ed]";
                       if (day.isSelectedStart || day.isSelectedEnd) {
-                        bgClass = "bg-[#d81b60] text-white font-black border-black shadow-[2px_2px_0px_#000]";
+                        bgClass = "bg-[#ec71a8] text-white font-black shadow-md shadow-[#ec71a8]/30";
                       } else if (day.isInRange) {
-                        bgClass = "bg-pink-100 text-[#d81b60] font-bold border-pink-300";
+                        bgClass = "bg-[#fce3ed] text-[#ec71a8] font-bold border-[#f9cee3]";
                       }
 
                       return (
                         <button
                           key={day.dateStr}
                           onClick={() => handleCalendarDayClick(day.dateStr)}
-                          className={`h-10 sm:h-12 rounded-xl border flex flex-col items-center justify-center relative transition-all cursor-pointer text-xs sm:text-sm ${bgClass}`}
+                          className={`h-10 sm:h-11 rounded-xl border flex flex-col items-center justify-center relative transition-all cursor-pointer text-xs sm:text-sm ${bgClass}`}
                         >
                           <span>{day.dayNumber}</span>
                           {day.hasServices && (
                             <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                              day.isSelectedStart || day.isSelectedEnd ? 'bg-white' : 'bg-[#d81b60]'
+                              day.isSelectedStart || day.isSelectedEnd ? 'bg-white' : 'bg-[#ec71a8]'
                             }`}></span>
                           )}
                         </button>
                       );
                     })}
                   </div>
-
-                  <div className="mt-4 pt-3 border-t border-pink-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#d81b60]"></span>
-                        <span>Punto rosa = Días con servicios</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded bg-pink-100 border border-pink-300"></span>
-                        <span>Rango seleccionado</span>
-                      </div>
-                    </div>
-                    <div className="font-semibold text-slate-700">
-                      {filterFrom && filterTo ? (
-                        <span>Filtrando del <b>{filterFrom}</b> al <b>{filterTo}</b></span>
-                      ) : filterFrom ? (
-                        <span>Haz clic en otro día para fijar la fecha final (Desde: <b>{filterFrom}</b>)</span>
-                      ) : (
-                        <span>Haz clic en un día para seleccionar inicio de rango</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* BANNER DE ESTADO DEL FILTRO ACTIVO */}
-              {(filterFrom || filterTo || searchTerm) && (
-                <div className="bg-pink-50 border-2 border-[#d81b60] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-sm">
-                  <div className="flex items-center gap-2 text-[#d81b60] font-bold">
-                    <Filter className="w-4 h-4" />
-                    <span>
-                      Filtro activo: {filterFrom ? `Desde ${filterFrom}` : ''} {filterTo ? `Hasta ${filterTo}` : ''} {searchTerm ? `· Búsqueda: "${searchTerm}"` : ''}
-                    </span>
-                    <span className="bg-white text-slate-800 text-xs px-2 py-0.5 rounded-full border border-pink-300">
-                      {filteredServices.length} resultados encontrados
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); }}
-                    className="text-xs font-extrabold text-[#d81b60] hover:underline cursor-pointer"
-                  >
-                    Mostrar todos los registros
-                  </button>
                 </div>
               )}
             </section>
 
-            {/* RESUMEN DE LAS CATEGORÍAS FILTRADAS EN INFORMES */}
+            {/* METRICAS TOTALES FILTRADAS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
+              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase">Mi Ganancia Filtrada</div>
-                  <div className="text-2xl font-black text-[#d81b60]">
-                    S/ {totalMyGain.toFixed(2)}
+                  <div className="text-xs font-bold text-[#8c8884] uppercase">Mi Ganancia Filtrada</div>
+                  <div className="text-2xl font-black text-[#ec71a8]">
+                    S/ {reportTotalMyGain.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-pink-100 text-[#d81b60] px-2.5 py-1 rounded-md border border-pink-300">
-                  {filteredServices.length} serv.
+                <div className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3 py-1.5 rounded-xl">
+                  {filteredServices.length} servicios
                 </div>
               </div>
 
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
+              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase">Ganancia Salón Filtrada</div>
-                  <div className="text-2xl font-black text-[#4f46e5]">
-                    S/ {totalSalonGain.toFixed(2)}
+                  <div className="text-xs font-bold text-[#8c8884] uppercase">Ganancia Salón Filtrada</div>
+                  <div className="text-2xl font-black text-[#1e1e1c]">
+                    S/ {reportTotalSalonGain.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-300">
+                <div className="text-xs font-bold bg-[#fdebdd] text-[#b8860b] px-3 py-1.5 rounded-xl">
                   Salón
                 </div>
               </div>
 
-              <div className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_#000] flex items-center justify-between">
+              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase">Facturación Total Filtrada</div>
-                  <div className="text-2xl font-black text-emerald-700">
-                    S/ {totalFacturado.toFixed(2)}
+                  <div className="text-xs font-bold text-[#8c8884] uppercase">Facturación Total Filtrada</div>
+                  <div className="text-2xl font-black text-[#b8860b]">
+                    S/ {reportTotalFacturado.toFixed(2)}
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-300">
-                  Bruto
+                <div className="text-xs font-bold bg-[#f5f3ef] text-[#6b6764] px-3 py-1.5 rounded-xl">
+                  Bruto Total
                 </div>
               </div>
             </div>
 
-            {/* TABLA DE HISTÓRICO DE SERVICIOS */}
-            <section className="bg-white border-3 border-black rounded-2xl p-6 sm:p-8 shadow-[8px_8px_0px_#000]">
+            {/* TABLA PRINCIPAL DE HISTORIAL CON BOTÓN DE EDITAR AL COSTADO DE ELIMINAR */}
+            <section className="card-luxury rounded-3xl p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-                    Historial de Servicios Realizados
+                  <h3 className="text-xl sm:text-2xl font-extrabold text-[#1e1e1c]">
+                    Historial Completo de Servicios
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-500">
-                    Listado detallado con desglose de comisión y ganancia
+                  <p className="text-xs sm:text-sm text-[#8c8884]">
+                    Puedes editar los datos o eliminar registros directamente desde la columna de acciones
                   </p>
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border-2 border-black">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+              <div className="overflow-x-auto rounded-2xl border border-[#fce3ed]">
+                <table className="w-full text-left border-collapse min-w-[750px]">
                   <thead>
-                    <tr className="bg-slate-900 text-white text-xs font-black uppercase tracking-wider">
+                    <tr className="bg-[#1e1e1c] text-white text-xs font-black uppercase tracking-wider">
                       <th className="p-4">Fecha</th>
                       <th className="p-4">Semana</th>
                       <th className="p-4">Servicio</th>
@@ -1073,56 +1477,72 @@ export default function App() {
                       <th className="p-4">Comisión</th>
                       <th className="p-4">Mi Ganancia</th>
                       <th className="p-4">Ganancia Salón</th>
-                      <th className="p-4 text-center">Acción</th>
+                      <th className="p-4 text-center">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y-2 divide-slate-100 text-sm">
-                    {filteredServices.length > 0 ? (
-                      filteredServices.map((item) => (
-                        <tr key={item.id} className="hover:bg-pink-50/50 transition-colors">
-                          <td className="p-4 whitespace-nowrap font-bold text-slate-800">{item.date}</td>
-                          <td className="p-4 whitespace-nowrap text-slate-500 font-semibold">{item.week}</td>
-                          <td className="p-4 whitespace-nowrap font-extrabold text-slate-900">
+                  <tbody className="divide-y divide-[#fce3ed] text-sm bg-white">
+                    {paginatedServices.length > 0 ? (
+                      paginatedServices.map((item) => (
+                        <tr key={item.id} className="hover:bg-[#fff5f8] transition-colors">
+                          <td className="p-4 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
+                          <td className="p-4 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
+                          <td className="p-4 whitespace-nowrap font-extrabold text-[#1e1e1c]">
                             {item.service}
                           </td>
-                          <td className="p-4 whitespace-nowrap font-bold text-slate-800">
+                          <td className="p-4 whitespace-nowrap font-bold text-[#1e1e1c]">
                             S/ {item.price.toFixed(2)}
                           </td>
                           <td className="p-4 whitespace-nowrap">
-                            <span className={`px-2.5 py-1 rounded-md text-xs font-black border ${
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
                               item.commission === 40
-                                ? 'bg-pink-100 text-[#d81b60] border-pink-300'
-                                : 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                ? 'bg-[#fce3ed] text-[#ec71a8] border-[#f9cee3]'
+                                : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
                             }`}>
                               {item.commission}%
                             </span>
                           </td>
-                          <td className="p-4 whitespace-nowrap font-black text-[#d81b60] text-base">
+                          <td className="p-4 whitespace-nowrap font-black text-[#ec71a8] text-base">
                             S/ {item.myGain.toFixed(2)}
                           </td>
-                          <td className="p-4 whitespace-nowrap font-bold text-indigo-900">
+                          <td className="p-4 whitespace-nowrap font-semibold text-[#6b6764]">
                             S/ {item.salongain.toFixed(2)}
                           </td>
                           <td className="p-4 whitespace-nowrap text-center">
-                            <button
-                              onClick={() => handleDeleteService(item.id)}
-                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition-all cursor-pointer"
-                              title="Eliminar registro"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              
+                              {/* BOTÓN DE EDITAR (AL COSTADO DEL BOTÓN DE ELIMINAR) */}
+                              <button
+                                onClick={() => handleOpenEdit(item)}
+                                className="p-2 bg-[#fdebdd]/80 hover:bg-[#fdebdd] text-[#b8860b] rounded-xl border border-[#edd5b6] transition-all cursor-pointer shadow-xs hover:scale-105 flex items-center gap-1 text-xs font-bold"
+                                title="Editar este servicio"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Editar</span>
+                              </button>
+
+                              {/* BOTÓN DE ELIMINAR */}
+                              <button
+                                onClick={() => handleDeleteService(item.id)}
+                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 transition-all cursor-pointer shadow-xs hover:scale-105 flex items-center gap-1 text-xs font-bold"
+                                title="Eliminar este servicio"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Eliminar</span>
+                              </button>
+
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="p-10 text-center text-slate-400">
+                        <td colSpan="8" className="p-10 text-center text-[#8c8884]">
                           <div className="flex flex-col items-center justify-center gap-2">
-                            <AlertCircle className="w-8 h-8 text-slate-300" />
-                            <span className="font-bold text-slate-600">No se encontraron servicios en este filtro.</span>
+                            <AlertCircle className="w-8 h-8 text-[#ec71a8]/40" />
+                            <span className="font-bold text-[#1e1e1c]">No se encontraron servicios en el filtro seleccionado.</span>
                             <button
                               onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); }}
-                              className="mt-2 text-xs text-[#d81b60] font-extrabold hover:underline"
+                              className="mt-2 text-xs text-[#ec71a8] font-extrabold hover:underline cursor-pointer"
                             >
                               Restablecer todos los filtros
                             </button>
@@ -1133,12 +1553,215 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+
+              {/* CONTROLES DE PAGINACIÓN EN LA PARTE INFERIOR */}
+              {filteredServices.length > itemsPerPage && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-5 border-t border-[#fce3ed]">
+                  <div className="text-xs text-[#8c8884] font-medium">
+                    Mostrando <span className="font-bold text-[#1e1e1c]">{(reportPage - 1) * itemsPerPage + 1}</span> a <span className="font-bold text-[#1e1e1c]">{Math.min(reportPage * itemsPerPage, filteredServices.length)}</span> de <span className="font-bold text-[#1e1e1c]">{filteredServices.length}</span> servicios
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Botón Página Anterior */}
+                    <button
+                      onClick={() => setReportPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={reportPage === 1}
+                      className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        reportPage === 1
+                          ? 'opacity-40 cursor-not-allowed border-[#fce3ed] text-[#8c8884]'
+                          : 'bg-white hover:bg-[#fce3ed] border-[#f9cee3] text-[#1e1e1c] cursor-pointer shadow-xs hover:scale-105'
+                      }`}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      Anterior
+                    </button>
+
+                    {/* Botones Numéricos de Página */}
+                    <div className="flex items-center gap-1.5">
+                      {Array.from({ length: totalReportPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          onClick={() => setReportPage(pageNum)}
+                          className={`w-8 h-8 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                            reportPage === pageNum
+                              ? 'bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white shadow-md shadow-[#ec71a8]/25'
+                              : 'bg-white hover:bg-[#fce3ed] text-[#6b6764] border border-[#f9cee3]'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Botón Página Siguiente */}
+                    <button
+                      onClick={() => setReportPage((prev) => Math.min(prev + 1, totalReportPages))}
+                      disabled={reportPage === totalReportPages}
+                      className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        reportPage === totalReportPages
+                          ? 'opacity-40 cursor-not-allowed border-[#fce3ed] text-[#8c8884]'
+                          : 'bg-white hover:bg-[#fce3ed] border-[#f9cee3] text-[#1e1e1c] cursor-pointer shadow-xs hover:scale-105'
+                      }`}
+                    >
+                      Siguiente
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
           </div>
         )}
 
       </main>
+
+      {/* ================= MODAL INTERACTIVO DE EDICIÓN DE SERVICIO ================= */}
+      {editingService && (
+        <div className="fixed inset-0 z-50 bg-[#1e1e1c]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#f9cee3] animate-modal relative">
+            
+            {/* CABECERA DEL MODAL */}
+            <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-[#1e1e1c]">
+                    Editar Registro de Servicio
+                  </h3>
+                  <p className="text-xs text-[#8c8884]">Modifica los datos del servicio y recalcularemos las ganancias</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setEditingService(null)}
+                className="p-2 rounded-xl text-[#8c8884] hover:bg-[#fce3ed] hover:text-[#1e1e1c] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* FORMULARIO DE EDICIÓN */}
+            <form onSubmit={handleSaveEdit} className="flex flex-col gap-5">
+              
+              {/* FECHA */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                />
+              </div>
+
+              {/* SERVICIO */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Servicio Realizado
+                </label>
+                <input
+                  type="text"
+                  value={editService}
+                  onChange={(e) => setEditService(e.target.value)}
+                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                />
+              </div>
+
+              {/* PRECIO Y COMISIÓN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Precio Cobrado (S/)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <Percent className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Comisión
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 h-[48px]">
+                    <button
+                      type="button"
+                      onClick={() => setEditCommission(30)}
+                      className={`flex items-center justify-center gap-1 rounded-2xl font-bold text-xs cursor-pointer border ${
+                        editCommission === 30
+                          ? 'bg-[#1e1e1c] text-[#ecc880] border-[#1e1e1c] shadow-sm'
+                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
+                      }`}
+                    >
+                      30% Salón
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditCommission(40)}
+                      className={`flex items-center justify-center gap-1 rounded-2xl font-bold text-xs cursor-pointer border ${
+                        editCommission === 40
+                          ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-sm'
+                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
+                      }`}
+                    >
+                      40% Regular
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* VISTA PREVIA DEL CÁLCULO AL EDITAR */}
+              {editLivePrice > 0 && (
+                <div className="bg-[#fff5f8] border border-[#f9cee3] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="font-extrabold text-[#1e1e1c]">
+                    Nuevo Cálculo:
+                  </div>
+                  <div className="flex items-center gap-3 font-bold">
+                    <span className="text-[#ec71a8]">Mi Ganancia: S/ {editLiveMyGain.toFixed(2)}</span>
+                    <span className="text-[#8c8884]">|</span>
+                    <span className="text-[#1e1e1c]">Salón: S/ {editLiveSalonGain.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* BOTONES DE ACCIÓN */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#fce3ed] mt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingService(null)}
+                  className="px-5 py-3 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-xs text-[#6b6764] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-xs shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  Guardar Cambios
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
