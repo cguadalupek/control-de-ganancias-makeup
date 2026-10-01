@@ -73,6 +73,23 @@ def init_db():
         )
     """)
 
+    # Tabla de productos / insumos (inventario del salón)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            price REAL NOT NULL DEFAULT 0,
+            purchase_date TEXT NOT NULL,
+            start_date TEXT,
+            expiration_date TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_expiration ON products(expiration_date)")
+
     # Precargar el catálogo inicial basado en los datos del salón si está vacío
     cursor.execute("SELECT COUNT(*) FROM catalogo_servicios")
     if cursor.fetchone()[0] == 0:
@@ -100,6 +117,15 @@ def init_db():
 @app.on_event("startup")
 def startup():
     init_db()
+    # Arrancar el bot de Telegram como hilo daemon (no bloquea FastAPI)
+    try:
+        from bot.telegram_bot import start_background
+        if start_background():
+            print('[startup] Bot de Telegram iniciado en segundo plano')
+        else:
+            print('[startup] Bot de Telegram no inició (token faltante)')
+    except Exception as e:
+        print(f'[startup] Error arrancando bot: {e}')
 
 # Modelos Pydantic
 class ServicioCreate(BaseModel):
@@ -112,6 +138,25 @@ class MetaUpdate(BaseModel):
     anio: int
     mes: int
     monto_meta: float
+
+# ============================================================
+# MODELOS: PRODUCTOS / INSUMOS (INVENTARIO)
+# ============================================================
+class ProductCreate(BaseModel):
+    name: str
+    quantity: int = 1
+    price: float = 0.0
+    purchase_date: str  # YYYY-MM-DD
+    start_date: Optional[str] = None
+    expiration_date: str  # YYYY-MM-DD
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    quantity: Optional[int] = None
+    price: Optional[float] = None
+    purchase_date: Optional[str] = None
+    start_date: Optional[str] = None
+    expiration_date: Optional[str] = None
 
 # Auxiliar para calcular el número de semana según el día del mes
 def calcular_semana_mes(fecha_obj: datetime.date) -> int:
@@ -360,3 +405,173 @@ def obtener_resumen_mes(anio: int, mes: int):
             } for r in registros
         ]
     }
+
+# ============================================================
+# ENDPOINTS: PRODUCTOS / INSUMOS
+# ============================================================
+def _validate_date(s: str, field: str):
+    """Valida formato YYYY-MM-DD; lanza HTTPException si es inválido."""
+    try:
+        return datetime.datetime.strptime(s, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail=f"Formato de fecha inválido en '{field}'. Usar YYYY-MM-DD")
+
+def _row_to_product(r):
+    """Convierte una fila SQLite a dict con campos normalizados."""
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "quantity": r["quantity"],
+        "price": r["price"],
+        "purchase_date": r["purchase_date"],
+        "start_date": r["start_date"],
+        "expiration_date": r["expiration_date"],
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+@app.post("/products")
+def crear_producto(data: ProductCreate):
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=400, detail="El nombre del producto es obligatorio")
+    if data.quantity < 1:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser al menos 1")
+    if data.price < 0:
+        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+
+    _validate_date(data.purchase_date, "purchase_date")
+    _validate_date(data.expiration_date, "expiration_date")
+    if data.start_date:
+        _validate_date(data.start_date, "start_date")
+
+    now_iso = datetime.datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO products (name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (data.name.strip(), data.quantity, data.price, data.purchase_date,
+          data.start_date, data.expiration_date, now_iso, now_iso))
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "ok",
+        "message": "Producto registrado correctamente",
+        "product": {
+            "id": new_id, "name": data.name.strip(), "quantity": data.quantity,
+            "price": data.price, "purchase_date": data.purchase_date,
+            "start_date": data.start_date, "expiration_date": data.expiration_date,
+            "created_at": now_iso, "updated_at": now_iso,
+        }
+    }
+
+@app.get("/products")
+def listar_productos(q: Optional[str] = Query(None, description="Búsqueda por nombre (LIKE)")):
+    conn = get_db()
+    cursor = conn.cursor()
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        cursor.execute("""
+            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+            FROM products WHERE name LIKE ? ORDER BY expiration_date ASC, name ASC
+        """, (like,))
+    else:
+        cursor.execute("""
+            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+            FROM products ORDER BY expiration_date ASC, name ASC
+        """)
+    rows = cursor.fetchall()
+    conn.close()
+    return {"cantidad": len(rows), "products": [_row_to_product(r) for r in rows]}
+
+@app.patch("/products/{product_id}/open")
+def abrir_producto_hoy(product_id: int):
+    """Marca el producto como abierto hoy (start_date = hoy)."""
+    today = datetime.date.today().isoformat()
+    now_iso = datetime.datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE products SET start_date = ?, updated_at = ? WHERE id = ?
+    """, (today, now_iso, product_id))
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        FROM products WHERE id = ?
+    """, (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"status": "ok", "message": f"Producto abierto hoy ({today})", "product": _row_to_product(row)}
+
+@app.put("/products/{product_id}")
+def actualizar_producto(product_id: int, data: ProductUpdate):
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No se proporcionaron campos a actualizar")
+
+    # Validaciones
+    if "purchase_date" in updates:
+        _validate_date(updates["purchase_date"], "purchase_date")
+    if "expiration_date" in updates:
+        _validate_date(updates["expiration_date"], "expiration_date")
+    if updates.get("start_date"):
+        _validate_date(updates["start_date"], "start_date")
+    if "quantity" in updates and updates["quantity"] < 1:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser al menos 1")
+    if "price" in updates and updates["price"] < 0:
+        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+    if "name" in updates and not updates["name"].strip():
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+
+    updates["updated_at"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
+
+    set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+    values = list(updates.values()) + [product_id]
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE products SET {set_clause} WHERE id = ?", values)
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        FROM products WHERE id = ?
+    """, (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"status": "ok", "message": "Producto actualizado", "product": _row_to_product(row)}
+
+@app.delete("/products/{product_id}")
+def eliminar_producto(product_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "message": f"Producto {product_id} eliminado"}
+
+@app.get("/products/by-name/{name}")
+def buscar_producto_por_nombre(name: str):
+    """Helper para el bot de Telegram: busca por coincidencia parcial."""
+    conn = get_db()
+    cursor = conn.cursor()
+    like = f"%{name}%"
+    cursor.execute("""
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        FROM products WHERE name LIKE ? ORDER BY expiration_date ASC LIMIT 5
+    """, (like,))
+    rows = cursor.fetchall()
+    conn.close()
+    return {"cantidad": len(rows), "products": [_row_to_product(r) for r in rows]}

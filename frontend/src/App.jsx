@@ -30,7 +30,14 @@ import {
   BarChart3,
   CalendarDays,
   SlidersHorizontal,
-  Flame
+  Flame,
+  Package,
+  CalendarCheck,
+  AlertTriangle,
+  Tag,
+  ShoppingBag,
+  Edit3,
+  Save
 } from 'lucide-react';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
@@ -84,12 +91,16 @@ function BrandLogo({ compact = false }) {
           </div>
         </div>
       )}
+
+
+
+
     </div>
   );
 }
 
 export default function App() {
-  // Navegación ('resumen' | 'nuevo_servicio' | 'informes')
+  // Navegación ('resumen' | 'nuevo_servicio' | 'productos' | 'informes')
   const [activeTab, setActiveTab] = useState('resumen');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -146,6 +157,35 @@ export default function App() {
   const [editPrice, setEditPrice] = useState('');
   const [editCommission, setEditCommission] = useState(40);
 
+  // ============================================================
+  // ESTADOS: MÓDULO DE PRODUCTOS / INVENTARIO
+  // ============================================================
+  const [products, setProducts] = useState([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [productLoading, setProductLoading] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  // Formulario de nuevo producto
+  const todayYMDProduct = todayYMD; // reutilizamos el todayYMD ya definido arriba
+  const [prodName, setProdName] = useState('');
+  const [prodQuantity, setProdQuantity] = useState(1);
+  const [prodPrice, setProdPrice] = useState('');
+  const [prodPurchaseDate, setProdPurchaseDate] = useState(todayYMDProduct);
+  const [prodStartDate, setProdStartDate] = useState('');
+  const [prodExpirationDate, setProdExpirationDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 6);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+
+  // Modal de edición de producto
+  const [editProdName, setEditProdName] = useState('');
+  const [editProdQuantity, setEditProdQuantity] = useState(1);
+  const [editProdPrice, setEditProdPrice] = useState('');
+  const [editProdPurchaseDate, setEditProdPurchaseDate] = useState('');
+  const [editProdStartDate, setEditProdStartDate] = useState('');
+  const [editProdExpirationDate, setEditProdExpirationDate] = useState('');
+
   // Toast de notificación
   const [toastMsg, setToastMsg] = useState(null);
   const showToast = (text, type = 'success') => {
@@ -178,6 +218,14 @@ export default function App() {
     };
     fetchServices();
   }, []);
+
+  // Cargar productos cuando se activa la pestaña "productos"
+  useEffect(() => {
+    if (activeTab === 'productos') {
+      fetchProducts(productSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Guardar en localStorage
   useEffect(() => {
@@ -326,6 +374,141 @@ export default function App() {
 
     setServices((prev) => prev.filter((item) => item.id !== id));
     showToast('Servicio eliminado', 'warning');
+  };
+
+  // ============================================================
+  // FUNCIONES: MÓDULO DE PRODUCTOS
+  // ============================================================
+  const fetchProducts = async (q = '') => {
+    setProductLoading(true);
+    try {
+      const url = q.trim()
+        ? `${API_BASE_URL}/products?q=${encodeURIComponent(q.trim())}`
+        : `${API_BASE_URL}/products`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data.products || []);
+      }
+    } catch (err) {
+      console.error('fetchProducts falló', err);
+      showToast('No se pudo conectar con el servidor', 'error');
+    } finally {
+      setProductLoading(false);
+    }
+  };
+
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    if (!prodName.trim()) {
+      showToast('El nombre del producto es obligatorio', 'error');
+      return;
+    }
+    const payload = {
+      name: prodName.trim(),
+      quantity: Number(prodQuantity) || 1,
+      price: Number(prodPrice) || 0,
+      purchase_date: prodPurchaseDate,
+      start_date: prodStartDate || null,
+      expiration_date: prodExpirationDate,
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Error al registrar producto');
+      }
+      showToast('¡Producto registrado!', 'success');
+      setProdName('');
+      setProdQuantity(1);
+      setProdPrice('');
+      setProdStartDate('');
+      const d = new Date();
+      d.setMonth(d.getMonth() + 6);
+      setProdExpirationDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      setProdPurchaseDate(todayYMD);
+      await fetchProducts(productSearch);
+    } catch (err) {
+      showToast(err.message || 'Error al registrar', 'error');
+    }
+  };
+
+  const handleOpenToday = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${id}/open`, { method: 'PATCH' });
+      if (!res.ok) throw new Error('No se pudo abrir');
+      const data = await res.json();
+      showToast(data.message || 'Producto abierto hoy', 'success');
+      await fetchProducts(productSearch);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm('¿Eliminar este producto del inventario?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('No se pudo eliminar');
+      showToast('Producto eliminado', 'warning');
+      await fetchProducts(productSearch);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
+  const openEditProduct = (p) => {
+    setEditingProduct(p);
+    setEditProdName(p.name);
+    setEditProdQuantity(p.quantity);
+    setEditProdPrice(String(p.price ?? ''));
+    setEditProdPurchaseDate(p.purchase_date);
+    setEditProdStartDate(p.start_date || '');
+    setEditProdExpirationDate(p.expiration_date);
+  };
+
+  const handleSaveEditProduct = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    const payload = {
+      name: editProdName.trim(),
+      quantity: Number(editProdQuantity) || 1,
+      price: Number(editProdPrice) || 0,
+      purchase_date: editProdPurchaseDate,
+      start_date: editProdStartDate || null,
+      expiration_date: editProdExpirationDate,
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Error al actualizar');
+      }
+      showToast('Producto actualizado', 'success');
+      setEditingProduct(null);
+      await fetchProducts(productSearch);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
+  // Lógica del semáforo de vencimiento
+  const getExpirationState = (expirationDate) => {
+    if (!expirationDate) return { color: 'gray', label: 'Sin fecha', days: null };
+    const exp = new Date(expirationDate + 'T00:00:00');
+    const t = new Date(todayYMD + 'T00:00:00');
+    const diffDays = Math.round((exp - t) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return { color: 'red', label: `Caducado hace ${-diffDays} días`, days: diffDays };
+    if (diffDays <= 15) return { color: 'yellow', label: `Vence en ${diffDays} días`, days: diffDays };
+    return { color: 'green', label: `Vigente (${diffDays} días)`, days: diffDays };
   };
 
   // Nombres de meses en español
@@ -626,6 +809,26 @@ export default function App() {
               </div>
             </button>
 
+            {/* 4. PRODUCTOS (INVENTARIO) */}
+            <button
+              onClick={() => { setActiveTab('productos'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
+                activeTab === 'productos'
+                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
+                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'productos' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                <Package className="w-4 h-4" />
+              </div>
+              <div className="text-left flex-1">
+                <span className="block font-extrabold">Mis Productos</span>
+                <span className={`text-[11px] block font-medium ${activeTab === 'productos' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                  Inventario y vencimientos
+                </span>
+              </div>
+            </button>
+
           </nav>
         </div>
 
@@ -660,11 +863,13 @@ export default function App() {
             <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1e1e1c] tracking-tight">
               {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
               {activeTab === 'nuevo_servicio' && 'Nuevo Registro de Servicio'}
+              {activeTab === 'productos' && 'Registro y Control de Productos'}
               {activeTab === 'informes' && 'Historial, Edición e Informes'}
             </h2>
             <p className="text-sm text-[#6b6764] font-medium mt-1">
               {activeTab === 'resumen' && 'El panel se actualiza automáticamente al inicio de cada mes.'}
               {activeTab === 'nuevo_servicio' && 'Calcula comisiones y distribuye la ganancia al instante.'}
+              {activeTab === 'productos' && 'Lleva el inventario de tu maquillaje y controla vencimientos con semáforo 🟢🟡🔴.'}
               {activeTab === 'informes' && 'Consulta cualquier rango de fechas, edita o elimina servicios registrados.'}
             </p>
           </div>
@@ -1632,7 +1837,247 @@ export default function App() {
           </div>
         )}
 
-      </main>
+      
+        {activeTab === 'productos' && (
+          <section className="flex flex-col gap-6 animate-modal">
+            {/* Formulario de registro */}
+            <div className="card-luxury rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] flex items-center justify-center shadow-md shadow-[#ec71a8]/25">
+                  <PlusCircle className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#1e1e1c]">Registrar Producto / Insumo</h3>
+                  <p className="text-xs text-[#6b6764] font-medium">Añade maquillaje o insumos al inventario</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateProduct} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Nombre del producto
+                  </label>
+                  <input
+                    type="text"
+                    value={prodName}
+                    onChange={(e) => setProdName(e.target.value)}
+                    placeholder="Ej: Pestañina Maybelline"
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Cantidad
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={prodQuantity}
+                    onChange={(e) => setProdQuantity(Number(e.target.value) || 1)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Precio / Costo (S/)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={prodPrice}
+                    onChange={(e) => setProdPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Fecha de compra
+                  </label>
+                  <input
+                    type="date"
+                    value={prodPurchaseDate}
+                    onChange={(e) => setProdPurchaseDate(e.target.value)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <CalendarCheck className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={prodStartDate}
+                    onChange={(e) => setProdStartDate(e.target.value)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Fecha de caducidad
+                  </label>
+                  <input
+                    type="date"
+                    value={prodExpirationDate}
+                    onChange={(e) => setProdExpirationDate(e.target.value)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    required
+                  />
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-3 flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-xs shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Registrar Producto
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Buscador + listado */}
+            <div className="card-luxury rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#fce3ed] flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5 text-[#ec71a8]" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-[#1e1e1c]">Mis Productos</h3>
+                    <p className="text-xs text-[#6b6764] font-medium">
+                      {products.length} producto{products.length === 1 ? '' : 's'} registrado{products.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                </div>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      fetchProducts(e.target.value);
+                    }}
+                    className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#f9cee3] text-sm font-medium bg-[#faf5f8] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 w-full sm:w-72"
+                  />
+                </div>
+              </div>
+
+              {productLoading ? (
+                <div className="py-12 text-center text-[#6b6764] text-sm font-medium">Cargando productos...</div>
+              ) : products.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Package className="w-12 h-12 text-[#f9cee3] mx-auto mb-3" />
+                  <p className="text-sm text-[#6b6764] font-medium">
+                    {productSearch ? 'No se encontraron productos con ese nombre.' : 'Aún no tienes productos registrados.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {products.map((p) => {
+                    const state = getExpirationState(p.expiration_date);
+                    const colorMap = {
+                      green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+                      yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
+                      red: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
+                      gray: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', dot: 'bg-slate-400' },
+                    };
+                    const c = colorMap[state.color];
+                    return (
+                      <div key={p.id} className={`relative rounded-2xl border-2 ${c.border} ${c.bg} p-5 transition-all hover:shadow-md`}>
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <h4 className="font-extrabold text-[#1e1e1c] text-base leading-tight flex-1">{p.name}</h4>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${c.bg} ${c.text} text-[10px] font-extrabold uppercase tracking-wider border ${c.border}`}>
+                            <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
+                            {state.color === 'green' && 'Vigente'}
+                            {state.color === 'yellow' && 'Por vencer'}
+                            {state.color === 'red' && 'Caducado'}
+                            {state.color === 'gray' && 'Sin fecha'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs text-[#4a4744] font-medium">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#8c8884]">Cantidad:</span>
+                            <span className="font-bold text-[#1e1e1c]">{p.quantity}</span>
+                          </div>
+                          {p.price > 0 && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#8c8884]">Precio:</span>
+                              <span className="font-bold text-[#1e1e1c]">S/ {Number(p.price).toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#8c8884]">Compra:</span>
+                            <span className="font-bold text-[#1e1e1c]">{p.purchase_date}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#8c8884]">Caducidad:</span>
+                            <span className="font-bold text-[#1e1e1c]">{p.expiration_date}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1.5 border-t border-current/10">
+                            <span className="text-[#8c8884]">Apertura:</span>
+                            <span className={`font-bold ${p.start_date ? 'text-[#1e1e1c]' : 'text-[#8c8884] italic'}`}>
+                              {p.start_date || 'Sin abrir'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className={`mt-3 text-[11px] font-bold ${c.text}`}>{state.label}</div>
+
+                        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-current/10">
+                          {!p.start_date && (
+                            <button
+                              onClick={() => handleOpenToday(p.id)}
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#ec71a8]/40 text-[#ec71a8] hover:bg-[#fce3ed] font-bold text-xs transition-colors cursor-pointer"
+                              title="Marca este producto como abierto hoy"
+                            >
+                              <CalendarCheck className="w-3.5 h-3.5" />
+                              Abrir Hoy
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openEditProduct(p)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#f9cee3] text-[#4a4744] hover:bg-[#fce3ed] hover:text-[#1e1e1c] font-bold text-xs transition-colors cursor-pointer"
+                            title="Editar producto"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(p.id)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 font-bold text-xs transition-colors cursor-pointer"
+                            title="Eliminar producto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+</main>
 
       {/* ================= MODAL INTERACTIVO DE EDICIÓN DE SERVICIO ================= */}
       {editingService && (
@@ -1780,6 +2225,118 @@ export default function App() {
           </div>
         </div>
       )}
+
+
+      {/* ================= MODAL: EDICIÓN DE PRODUCTO ================= */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 bg-[#1e1e1c]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#f9cee3] animate-modal relative">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#fce3ed] flex items-center justify-center">
+                  <Package className="w-5 h-5 text-[#ec71a8]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#1e1e1c]">Editar Producto</h3>
+                  <p className="text-xs text-[#6b6764] font-medium">Modifica los datos o cambia la fecha de apertura</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="p-2 rounded-xl hover:bg-[#faf5f8] text-[#6b6764] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProduct} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Nombre</label>
+                <input
+                  type="text"
+                  value={editProdName}
+                  onChange={(e) => setEditProdName(e.target.value)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Cantidad</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editProdQuantity}
+                  onChange={(e) => setEditProdQuantity(Number(e.target.value) || 1)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Precio (S/)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editProdPrice}
+                  onChange={(e) => setEditProdPrice(e.target.value)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Fecha de compra</label>
+                <input
+                  type="date"
+                  value={editProdPurchaseDate}
+                  onChange={(e) => setEditProdPurchaseDate(e.target.value)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Fecha de apertura</label>
+                <input
+                  type="date"
+                  value={editProdStartDate}
+                  onChange={(e) => setEditProdStartDate(e.target.value)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Fecha de caducidad</label>
+                <input
+                  type="date"
+                  value={editProdExpirationDate}
+                  onChange={(e) => setEditProdExpirationDate(e.target.value)}
+                  className="p-3 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                />
+              </div>
+
+              <div className="sm:col-span-2 flex justify-end gap-3 pt-4 border-t border-[#fce3ed] mt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="px-5 py-2.5 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-xs text-[#6b6764] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-xs shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
     </div>
   );

@@ -149,3 +149,51 @@ La aplicación se abrirá en `http://localhost:5173`.
 
 Este proyecto está bajo la licencia MIT. Puedes usarlo y modificarlo libremente.
 
+
+## 🤖 Bot de Telegram + IA Local
+
+El sistema incluye un bot de Telegram que se ejecuta como hilo daemon dentro del
+backend FastAPI y permite consultar y actualizar el inventario por chat,
+interpretando el lenguaje natural con un LLM local (Ollama).
+
+Configuración en `backend/.env`:
+
+    TELEGRAM_BOT_TOKEN=<token_del_bot>
+    BACKEND_URL=http://localhost:8000
+    OLLAMA_URL=http://172.17.0.1:11434
+    OLLAMA_MODEL=hermes3
+    OLLAMA_TIMEOUT=60
+
+Ejemplos de uso desde Telegram:
+
+- ¿Cómo está mi pestañina maybelline?
+- Base Estée Lauder
+- Hoy abrí la pestañina (actualiza start_date automáticamente)
+- /productos (lista el inventario completo)
+- /ayuda (muestra los comandos)
+
+Si el LLM no responde, el bot usa reglas heurísticas en español como fallback.
+
+## 📦 Módulo "Mis Productos" (Inventario)
+
+Nuevo módulo entre "Registrar Servicio" e "Informes" con:
+
+- Registro: nombre, cantidad, precio, fecha de compra, fecha de apertura (opcional) y fecha de caducidad.
+- Listado en tarjetas con semáforo dinámico:
+  - 🟢 Vigente (>15 días para vencer)
+  - 🟡 Próximo a vencer (≤15 días)
+  - 🔴 Caducado
+- Botón rápido "Abrir Hoy" (PATCH /products/:id/open) para productos sin abrir.
+- Edición completa desde un modal (PUT /products/:id).
+- Búsqueda por nombre con debounce.
+
+## 🔌 Endpoints de Inventario
+
+| Método | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| POST   | /products                     | Registrar un nuevo producto |
+| GET    | /products                     | Listar (acepta ?q= para búsqueda) |
+| GET    | /products/by-name/{name}      | Búsqueda por coincidencia parcial (bot) |
+| PATCH  | /products/{id}/open           | Marcar como abierto hoy |
+| PUT    | /products/{id}                | Actualizar producto |
+| DELETE | /products/{id}                | Eliminar producto |
