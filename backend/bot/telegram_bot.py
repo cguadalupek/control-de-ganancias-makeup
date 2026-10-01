@@ -134,6 +134,17 @@ def api_finish_product(product_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+def api_delete_product(product_id: int) -> bool:
+    """Elimina un producto del inventario."""
+    try:
+        r = requests.delete(f"{BACKEND_URL}/products/{product_id}", timeout=10)
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        logger.exception("api_delete_product falló")
+        return False
+
+
 def api_find_product(query: str) -> List[Dict[str, Any]]:
     return api_list_products(q=query)
 
@@ -152,10 +163,12 @@ Tu trabajo es clasificar el mensaje del usuario en UNA de estas intenciones:
 - "terminar":   cuando indica que un producto se terminó/agotó o quiere marcarlo
                como terminado (ej: "se terminó la pestañina", "agotado la base",
                "marcar el sérum como terminado").
+- "eliminar":   cuando pide BORRAR/ELIMINAR un producto del inventario
+               (ej: "elimina la pestañina", "borra el sérum", "quita ese producto").
 - "otro":       cualquier otra cosa (saludos, dudas generales, etc.).
 
 Respondes SOLO un JSON estricto con esta forma:
-{"intent": "consultar"|"abrir"|"terminar"|"otro", "product_query": "<texto>", "reply": "<texto>"}
+{"intent": "consultar"|"abrir"|"terminar"|"eliminar"|"otro", "product_query": "<texto>", "reply": "<texto>"}
 
 Reglas:
 - product_query: si menciona un producto, escribe solo el nombre clave
@@ -170,6 +183,7 @@ def _heuristic_intent(text: str) -> Tuple[str, str, str]:
     t = text.lower()
     open_kw = ["hoy abrí", "hoy abri", "acabo de abrir", "ya abrí", "ya abri", "estoy abriendo", "abrí hoy", "abri hoy"]
     list_kw = ["qué tengo", "que tengo", "lista", "todos", "todos los productos", "vencimientos", "vencer", "caducar", "caducados"]
+    delete_kw = ["elimina", "eliminar", "borra", "borrar", "quita", "quitar", "retira", "remueve", "saca del inventario"]
     finish_kw = ["terminó", "termino", "agotó", "agoto", "se terminó", "se termino", "se agotó", "se agoto",
                  "terminó de", "terminado", "agotado", "se acabó", "se acabo", "ya no tengo", "quedaron sin"]
     if any(k in t for k in open_kw):
@@ -177,6 +191,17 @@ def _heuristic_intent(text: str) -> Tuple[str, str, str]:
         m = re.search(r"abr[ií]\s+(?:la|el|los|las)?\s*(.+)", text, re.IGNORECASE)
         query = m.group(1).strip().rstrip(".") if m else ""
         return ("abrir", query, "Entendido, marcando como abierto hoy.")
+    if any(k in t for k in delete_kw):
+        # "elimina/borra/quita X"
+        m = re.search(r"(?:elimina|borra|quita|retira|remueve)\s+(?:el|la|los|las|del|de\s+el)?\s*(.+)", text, re.IGNORECASE)
+        query = m.group(1).strip().rstrip(".,") if m else ""
+        # limpiar artículos iniciales en bucle
+        prev = None
+        while prev != query:
+            prev = query
+            query = re.sub(r"^(?:el\s+|la\s+|los\s+|las\s+|del\s+|de\s+)", "", query, flags=re.IGNORECASE)
+            query = query.strip().rstrip(".,")
+        return ("eliminar", query, "Entendido, voy a eliminar ese producto del inventario.")
     if any(k in t for k in finish_kw):
         # Estrategia 1: frases "se terminó/agotó/acabó X"
         m = re.search(r"(?:se\s+termin[oó]|se\s+agot[oó]|se\s+acab[oó]|termin[oó]\s+el?\s*|agot[oó]\s+(?:el|la|los|las|del)?\s*)\s*(.+)", text, re.IGNORECASE)
@@ -256,7 +281,8 @@ def _register_handlers(bot: telebot.TeleBot) -> None:
             "• *¿Cómo está mi pestañina maybelline?*\n"
             "• *¿Qué productos tengo por vencer?*\n"
             "• *Hoy abrí la base estée lauder*\n"
-            "• *Se terminó el sérum revox*  → lo marca como agotado\n\n"
+            "• *Se terminó el sérum revox*  → lo marca como agotado\n"
+            "• *Elimina el sérum*  → lo borra del inventario\n\n"
             "Comandos:\n"
             "/productos - lista todos\n"
             "/ayuda - este mensaje",
@@ -352,6 +378,38 @@ def _register_handlers(bot: telebot.TeleBot) -> None:
                 )
             else:
                 bot.reply_to(m, "❌ No pude actualizar el producto, intenta más tarde.")
+            return
+
+        if intent == "eliminar":
+            if not query:
+                bot.reply_to(m, "¿Qué producto quieres eliminar del inventario? Dime el nombre, por favor.")
+                return
+            matches = api_find_product(query)
+            if not matches:
+                bot.reply_to(
+                    m,
+                    f"🤔 No encontré un producto que coincida con *{query}*.",
+                    parse_mode="Markdown",
+                )
+                return
+            if len(matches) > 1:
+                listado = "\n".join(f"• {p['name']} (id {p['id']}, {p['status']})" for p in matches)
+                bot.reply_to(
+                    m,
+                    f"Encontré varios productos. ¿Cuál quieres eliminar?\n{listado}",
+                    parse_mode="Markdown",
+                )
+                return
+            target = matches[0]
+            removed = api_delete_product(target["id"])
+            if removed:
+                bot.reply_to(
+                    m,
+                    f"🗑️ Listo, *{target['name']}* fue eliminado del inventario.",
+                    parse_mode="Markdown",
+                )
+            else:
+                bot.reply_to(m, "❌ No pude eliminar el producto, intenta más tarde.")
             return
 
         if intent == "consultar":
