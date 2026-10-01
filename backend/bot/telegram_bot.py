@@ -58,6 +58,16 @@ def _days_until(date_str: Optional[str]) -> Optional[int]:
 
 
 def _format_product_for_chat(p: Dict[str, Any]) -> str:
+    # Si el producto está terminado, se refleja y no se evalúa el semáforo de vencimiento
+    if p.get("status") == "terminado":
+        return (
+            f"• *{p['name']}*\n"
+            f"   ⚫ *TERMINADO / AGOTADO*\n"
+            f"   Cantidad: {p.get('quantity', 0)}\n"
+            f"   Caducidad: {p.get('expiration_date', '—')}\n"
+            f"   Apertura: {p.get('start_date', '—')}"
+        )
+
     days = _days_until(p.get("expiration_date"))
     if days is None:
         estado = "⚪️ Sin fecha de caducidad"
@@ -113,6 +123,17 @@ def api_open_product(product_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+def api_finish_product(product_id: int) -> Optional[Dict[str, Any]]:
+    """Marca un producto como terminado/agotado."""
+    try:
+        r = requests.patch(f"{BACKEND_URL}/products/{product_id}/finish", timeout=10)
+        r.raise_for_status()
+        return r.json().get("product")
+    except Exception as e:
+        logger.exception("api_finish_product falló")
+        return None
+
+
 def api_find_product(query: str) -> List[Dict[str, Any]]:
     return api_list_products(q=query)
 
@@ -128,10 +149,13 @@ Tu trabajo es clasificar el mensaje del usuario en UNA de estas intenciones:
                 "qué productos tengo", "vencimientos", "lista de productos").
 - "abrir":      cuando indica que abrió/va a abrir un producto HOY
                (ej: "hoy abrí la pestañina", "acabo de abrir la base").
+- "terminar":   cuando indica que un producto se terminó/agotó o quiere marcarlo
+               como terminado (ej: "se terminó la pestañina", "agotado la base",
+               "marcar el sérum como terminado").
 - "otro":       cualquier otra cosa (saludos, dudas generales, etc.).
 
 Respondes SOLO un JSON estricto con esta forma:
-{"intent": "consultar"|"abrir"|"otro", "product_query": "<texto>", "reply": "<texto>"}
+{"intent": "consultar"|"abrir"|"terminar"|"otro", "product_query": "<texto>", "reply": "<texto>"}
 
 Reglas:
 - product_query: si menciona un producto, escribe solo el nombre clave
@@ -146,11 +170,37 @@ def _heuristic_intent(text: str) -> Tuple[str, str, str]:
     t = text.lower()
     open_kw = ["hoy abrí", "hoy abri", "acabo de abrir", "ya abrí", "ya abri", "estoy abriendo", "abrí hoy", "abri hoy"]
     list_kw = ["qué tengo", "que tengo", "lista", "todos", "todos los productos", "vencimientos", "vencer", "caducar", "caducados"]
+    finish_kw = ["terminó", "termino", "agotó", "agoto", "se terminó", "se termino", "se agotó", "se agoto",
+                 "terminó de", "terminado", "agotado", "se acabó", "se acabo", "ya no tengo", "quedaron sin"]
     if any(k in t for k in open_kw):
         # extraer nombre del producto tras "abrí"/"abri"
         m = re.search(r"abr[ií]\s+(?:la|el|los|las)?\s*(.+)", text, re.IGNORECASE)
         query = m.group(1).strip().rstrip(".") if m else ""
         return ("abrir", query, "Entendido, marcando como abierto hoy.")
+    if any(k in t for k in finish_kw):
+        # Estrategia 1: frases "se terminó/agotó/acabó X"
+        m = re.search(r"(?:se\s+termin[oó]|se\s+agot[oó]|se\s+acab[oó]|termin[oó]\s+el?\s*|agot[oó]\s+(?:el|la|los|las|del)?\s*)\s*(.+)", text, re.IGNORECASE)
+        # Estrategia 2: "marcar X como terminado/agotado" / "X terminado/agotado"
+        m2 = re.search(r"marcar\s+(?:el|la|los|las)?\s*(.+?)\s+como\s+(?:terminad[oa]|agotad[oa])", text, re.IGNORECASE)
+        if m:
+            query = m.group(1).strip().rstrip(".,")
+        elif m2:
+            query = m2.group(1).strip()
+        else:
+            # fallback: extraer "X terminado/agotado" o "X" sin keyword
+            query = re.sub(r"\s+(?:terminad[oa]|agotad[oa])\s*$", "", text, flags=re.IGNORECASE)
+            # quitar preludio genérico
+            query = re.sub(r"^(?:marcar\s+(?:el|la|los|las)\s+|se\s+(?:termin[oó]|agot[oó]|acab[oó])\s+)", "", query, flags=re.IGNORECASE)
+            query = query.replace("marcar como", "").replace("como terminado", "").replace("como agotado", "").strip()
+        query = re.sub(r"\s+como\s+(?:terminad[oa]|agotad[oa])\s*$", "", query, flags=re.IGNORECASE)
+        query = query.strip().strip(".,")
+        # Limpiar artículos/palabras-clave iniciales en bucle hasta estabilizar
+        prev = None
+        while prev != query:
+            prev = query
+            query = re.sub(r"^(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+|del\s+|terminad[oa]\s+|agotad[oa]\s+)", "", query, flags=re.IGNORECASE)
+            query = query.strip().strip(".,")
+        return ("terminar", query, "Entendido, marcando como terminado/agotado.")
     if any(k in t for k in list_kw):
         return ("consultar", "", "Aquí tienes el inventario:")
     # por defecto consultar con el texto completo como búsqueda
@@ -205,7 +255,8 @@ def _register_handlers(bot: telebot.TeleBot) -> None:
             "Puedes preguntarme cosas como:\n"
             "• *¿Cómo está mi pestañina maybelline?*\n"
             "• *¿Qué productos tengo por vencer?*\n"
-            "• *Hoy abrí la base estée lauder*\n\n"
+            "• *Hoy abrí la base estée lauder*\n"
+            "• *Se terminó el sérum revox*  → lo marca como agotado\n\n"
             "Comandos:\n"
             "/productos - lista todos\n"
             "/ayuda - este mensaje",
@@ -255,6 +306,47 @@ def _register_handlers(bot: telebot.TeleBot) -> None:
                 bot.reply_to(
                     m,
                     f"✅ Listo, *{updated['name']}* marcado como abierto hoy.\n\n"
+                    + _format_product_for_chat(updated),
+                    parse_mode="Markdown",
+                )
+            else:
+                bot.reply_to(m, "❌ No pude actualizar el producto, intenta más tarde.")
+            return
+
+        if intent == "terminar":
+            if not query:
+                bot.reply_to(m, "¿Qué producto se terminó/agotó? Dime el nombre, por favor.")
+                return
+            matches = api_find_product(query)
+            if not matches:
+                bot.reply_to(
+                    m,
+                    f"🤔 No encontré un producto que coincida con *{query}*.\n"
+                    f"¿Quieres que lo registre? Dime los datos (cantidad, fechas).",
+                    parse_mode="Markdown",
+                )
+                return
+            if len(matches) > 1:
+                listado = "\n".join(f"• {p['name']} (id {p['id']}, {p['status']})" for p in matches)
+                bot.reply_to(
+                    m,
+                    f"Encontré varios productos. ¿Cuál quieres marcar como terminado?\n{listado}",
+                    parse_mode="Markdown",
+                )
+                return
+            target = matches[0]
+            if target.get("status") == "terminado":
+                bot.reply_to(
+                    m,
+                    f"ℹ️ *{target['name']}* ya estaba marcado como terminado.",
+                    parse_mode="Markdown",
+                )
+                return
+            updated = api_finish_product(target["id"])
+            if updated:
+                bot.reply_to(
+                    m,
+                    f"✅ Listo, *{updated['name']}* marcado como terminado/agotado.\n\n"
                     + _format_product_for_chat(updated),
                     parse_mode="Markdown",
                 )

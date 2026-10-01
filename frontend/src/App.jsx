@@ -162,6 +162,7 @@ export default function App() {
   // ============================================================
   const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState('activo'); // 'activo' | 'terminado' | 'todos'
   const [productLoading, setProductLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -185,6 +186,7 @@ export default function App() {
   const [editProdPurchaseDate, setEditProdPurchaseDate] = useState('');
   const [editProdStartDate, setEditProdStartDate] = useState('');
   const [editProdExpirationDate, setEditProdExpirationDate] = useState('');
+  const [editProdStatus, setEditProdStatus] = useState('activo');
 
   // Toast de notificación
   const [toastMsg, setToastMsg] = useState(null);
@@ -222,10 +224,10 @@ export default function App() {
   // Cargar productos cuando se activa la pestaña "productos"
   useEffect(() => {
     if (activeTab === 'productos') {
-      fetchProducts(productSearch);
+      fetchProducts(productSearch, productStatusFilter);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, productStatusFilter]);
 
   // Guardar en localStorage
   useEffect(() => {
@@ -379,12 +381,14 @@ export default function App() {
   // ============================================================
   // FUNCIONES: MÓDULO DE PRODUCTOS
   // ============================================================
-  const fetchProducts = async (q = '') => {
+  const fetchProducts = async (q = '', status = '') => {
     setProductLoading(true);
     try {
-      const url = q.trim()
-        ? `${API_BASE_URL}/products?q=${encodeURIComponent(q.trim())}`
-        : `${API_BASE_URL}/products`;
+      const params = new URLSearchParams();
+      if (q.trim()) params.set('q', q.trim());
+      if (status && status !== 'todos') params.set('status', status);
+      const qs = params.toString();
+      const url = qs ? `${API_BASE_URL}/products?${qs}` : `${API_BASE_URL}/products`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -431,7 +435,7 @@ export default function App() {
       d.setMonth(d.getMonth() + 6);
       setProdExpirationDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
       setProdPurchaseDate(todayYMD);
-      await fetchProducts(productSearch);
+      await fetchProducts(productSearch, productStatusFilter);
     } catch (err) {
       showToast(err.message || 'Error al registrar', 'error');
     }
@@ -443,7 +447,30 @@ export default function App() {
       if (!res.ok) throw new Error('No se pudo abrir');
       const data = await res.json();
       showToast(data.message || 'Producto abierto hoy', 'success');
-      await fetchProducts(productSearch);
+      await fetchProducts(productSearch, productStatusFilter);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
+  const handleFinishProduct = async (id) => {
+    if (!window.confirm('¿Marcar este producto como terminado/agotado?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${id}/finish`, { method: 'PATCH' });
+      if (!res.ok) throw new Error('No se pudo marcar como terminado');
+      showToast('Producto marcado como terminado', 'success');
+      await fetchProducts(productSearch, productStatusFilter);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  };
+
+  const handleReactivateProduct = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${id}/reactivate`, { method: 'PATCH' });
+      if (!res.ok) throw new Error('No se pudo reactivar');
+      showToast('Producto reactivado', 'success');
+      await fetchProducts(productSearch, productStatusFilter);
     } catch (err) {
       showToast(err.message || 'Error', 'error');
     }
@@ -455,7 +482,7 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('No se pudo eliminar');
       showToast('Producto eliminado', 'warning');
-      await fetchProducts(productSearch);
+      await fetchProducts(productSearch, productStatusFilter);
     } catch (err) {
       showToast(err.message || 'Error', 'error');
     }
@@ -469,6 +496,7 @@ export default function App() {
     setEditProdPurchaseDate(p.purchase_date);
     setEditProdStartDate(p.start_date || '');
     setEditProdExpirationDate(p.expiration_date);
+    setEditProdStatus(p.status || 'activo');
   };
 
   const handleSaveEditProduct = async (e) => {
@@ -481,6 +509,7 @@ export default function App() {
       purchase_date: editProdPurchaseDate,
       start_date: editProdStartDate || null,
       expiration_date: editProdExpirationDate,
+      status: editProdStatus,
     };
     try {
       const res = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
@@ -494,7 +523,7 @@ export default function App() {
       }
       showToast('Producto actualizado', 'success');
       setEditingProduct(null);
-      await fetchProducts(productSearch);
+      await fetchProducts(productSearch, productStatusFilter);
     } catch (err) {
       showToast(err.message || 'Error', 'error');
     }
@@ -1965,18 +1994,46 @@ export default function App() {
                     </p>
                   </div>
                 </div>
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nombre..."
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      fetchProducts(e.target.value);
-                    }}
-                    className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#f9cee3] text-sm font-medium bg-[#faf5f8] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 w-full sm:w-72"
-                  />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre..."
+                      value={productSearch}
+                      onChange={(e) => {
+                        setProductSearch(e.target.value);
+                        fetchProducts(e.target.value, productStatusFilter);
+                      }}
+                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#f9cee3] text-sm font-medium bg-[#faf5f8] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 w-full sm:w-56"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#fce3ed]/60 border border-[#f9cee3]">
+                    <button
+                      onClick={() => setProductStatusFilter('activo')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        productStatusFilter === 'activo' ? 'bg-[#ec71a8] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                      }`}
+                    >
+                      🟢 Activos
+                    </button>
+                    <button
+                      onClick={() => setProductStatusFilter('terminado')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        productStatusFilter === 'terminado' ? 'bg-[#1e1e1c] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                      }`}
+                    >
+                      ⚫ Terminados
+                    </button>
+                    <button
+                      onClick={() => setProductStatusFilter('todos')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        productStatusFilter === 'todos' ? 'bg-[#d95392] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                      }`}
+                    >
+                      Todos
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1992,31 +2049,36 @@ export default function App() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {products.map((p) => {
-                    const state = getExpirationState(p.expiration_date);
+                    const isTerminated = p.status === 'terminado';
+                    // Products terminados no participan en el semáforo de vencimiento
+                    const state = isTerminated
+                      ? { color: 'gray', label: 'Terminado / Agotado', days: null }
+                      : getExpirationState(p.expiration_date);
                     const colorMap = {
                       green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
                       yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
                       red: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
-                      gray: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', dot: 'bg-slate-400' },
+                      gray: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', dot: 'bg-slate-400' },
                     };
                     const c = colorMap[state.color];
                     return (
-                      <div key={p.id} className={`relative rounded-2xl border-2 ${c.border} ${c.bg} p-5 transition-all hover:shadow-md`}>
+                      <div key={p.id} className={`relative rounded-2xl border-2 ${c.border} ${c.bg} p-5 transition-all hover:shadow-md ${isTerminated ? 'opacity-75 grayscale-[30%]' : ''}`}>
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <h4 className="font-extrabold text-[#1e1e1c] text-base leading-tight flex-1">{p.name}</h4>
+                          <h4 className={`font-extrabold text-base leading-tight flex-1 ${isTerminated ? 'text-[#6b6764] line-through' : 'text-[#1e1e1c]'}`}>{p.name}</h4>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${c.bg} ${c.text} text-[10px] font-extrabold uppercase tracking-wider border ${c.border}`}>
                             <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
-                            {state.color === 'green' && 'Vigente'}
-                            {state.color === 'yellow' && 'Por vencer'}
-                            {state.color === 'red' && 'Caducado'}
-                            {state.color === 'gray' && 'Sin fecha'}
+                            {isTerminated ? 'Terminado' : ''}
+                            {!isTerminated && state.color === 'green' && 'Vigente'}
+                            {!isTerminated && state.color === 'yellow' && 'Por vencer'}
+                            {!isTerminated && state.color === 'red' && 'Caducado'}
+                            {!isTerminated && state.color === 'gray' && 'Sin fecha'}
                           </span>
                         </div>
 
                         <div className="space-y-1.5 text-xs text-[#4a4744] font-medium">
                           <div className="flex items-center justify-between">
                             <span className="text-[#8c8884]">Cantidad:</span>
-                            <span className="font-bold text-[#1e1e1c]">{p.quantity}</span>
+                            <span className="font-bold text-[#1e1e1c]">{isTerminated ? 0 : p.quantity}</span>
                           </div>
                           {p.price > 0 && (
                             <div className="flex items-center justify-between">
@@ -2040,10 +2102,12 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className={`mt-3 text-[11px] font-bold ${c.text}`}>{state.label}</div>
+                        <div className={`mt-3 text-[11px] font-bold ${c.text}`}>
+                          {isTerminated ? '⚠️ Terminado / Agotado — fuera del semáforo de vencimiento' : state.label}
+                        </div>
 
                         <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-current/10">
-                          {!p.start_date && (
+                          {!isTerminated && !p.start_date && (
                             <button
                               onClick={() => handleOpenToday(p.id)}
                               className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#ec71a8]/40 text-[#ec71a8] hover:bg-[#fce3ed] font-bold text-xs transition-colors cursor-pointer"
@@ -2051,6 +2115,26 @@ export default function App() {
                             >
                               <CalendarCheck className="w-3.5 h-3.5" />
                               Abrir Hoy
+                            </button>
+                          )}
+                          {!isTerminated && (
+                            <button
+                              onClick={() => handleFinishProduct(p.id)}
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#1e1e1c]/30 text-[#1e1e1c] hover:bg-[#1e1e1c] hover:text-white font-bold text-xs transition-colors cursor-pointer"
+                              title="Marcar este producto como terminado/agotado"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Terminado
+                            </button>
+                          )}
+                          {isTerminated && (
+                            <button
+                              onClick={() => handleReactivateProduct(p.id)}
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-emerald-400/40 text-emerald-600 hover:bg-emerald-50 font-bold text-xs transition-colors cursor-pointer"
+                              title="Volver a activar este producto"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Reactivar
                             </button>
                           )}
                           <button
@@ -2315,6 +2399,34 @@ export default function App() {
                   required
                 />
               </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744]">Estado</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditProdStatus('activo')}
+                      className={`flex items-center justify-center gap-1.5 rounded-2xl font-bold text-xs cursor-pointer border py-3 ${
+                        editProdStatus === 'activo'
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
+                      }`}
+                    >
+                      🟢 Activo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditProdStatus('terminado')}
+                      className={`flex items-center justify-center gap-1.5 rounded-2xl font-bold text-xs cursor-pointer border py-3 ${
+                        editProdStatus === 'terminado'
+                          ? 'bg-[#1e1e1c] text-white border-[#1e1e1c] shadow-sm'
+                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
+                      }`}
+                    >
+                      ⚫ Terminado
+                    </button>
+                  </div>
+                </div>
 
               <div className="sm:col-span-2 flex justify-end gap-3 pt-4 border-t border-[#fce3ed] mt-2">
                 <button

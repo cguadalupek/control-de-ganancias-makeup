@@ -83,12 +83,19 @@ def init_db():
             purchase_date TEXT NOT NULL,
             start_date TEXT,
             expiration_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'activo',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
     """)
+    # Migración: si la columna status no existe aún (tabla preexistente), agregarla
+    cursor.execute("PRAGMA table_info(products)")
+    cols = [row[1] for row in cursor.fetchall()]
+    if "status" not in cols:
+        cursor.execute("ALTER TABLE products ADD COLUMN status TEXT NOT NULL DEFAULT 'activo'")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_expiration ON products(expiration_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_status ON products(status)")
 
     # Precargar el catálogo inicial basado en los datos del salón si está vacío
     cursor.execute("SELECT COUNT(*) FROM catalogo_servicios")
@@ -157,6 +164,7 @@ class ProductUpdate(BaseModel):
     purchase_date: Optional[str] = None
     start_date: Optional[str] = None
     expiration_date: Optional[str] = None
+    status: Optional[str] = None  # 'activo' | 'terminado'
 
 # Auxiliar para calcular el número de semana según el día del mes
 def calcular_semana_mes(fecha_obj: datetime.date) -> int:
@@ -426,6 +434,7 @@ def _row_to_product(r):
         "purchase_date": r["purchase_date"],
         "start_date": r["start_date"],
         "expiration_date": r["expiration_date"],
+        "status": r["status"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -448,10 +457,10 @@ def crear_producto(data: ProductCreate):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO products (name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data.name.strip(), data.quantity, data.price, data.purchase_date,
-          data.start_date, data.expiration_date, now_iso, now_iso))
+          data.start_date, data.expiration_date, "activo", now_iso, now_iso))
     new_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -463,25 +472,35 @@ def crear_producto(data: ProductCreate):
             "id": new_id, "name": data.name.strip(), "quantity": data.quantity,
             "price": data.price, "purchase_date": data.purchase_date,
             "start_date": data.start_date, "expiration_date": data.expiration_date,
+            "status": "activo",
             "created_at": now_iso, "updated_at": now_iso,
         }
     }
 
 @app.get("/products")
-def listar_productos(q: Optional[str] = Query(None, description="Búsqueda por nombre (LIKE)")):
+def listar_productos(q: Optional[str] = Query(None, description="Búsqueda por nombre (LIKE)"),
+                     status: Optional[str] = Query(None, description="Filtrar por estado: activo|terminado")):
     conn = get_db()
     cursor = conn.cursor()
+    if status and status.strip() not in ("activo", "terminado", "todos"):
+        raise HTTPException(status_code=400, detail="status debe ser 'activo', 'terminado' o 'todos'")
+    # Los productos sin status (legacy) se tratan como activos
+    status_filter = ""
+    params = []
+    if status and status.strip() in ("activo", "terminado"):
+        status_filter = " AND COALESCE(status, 'activo') = ?"
+        params.append(status.strip())
     if q and q.strip():
         like = f"%{q.strip()}%"
         cursor.execute("""
-            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
-            FROM products WHERE name LIKE ? ORDER BY expiration_date ASC, name ASC
-        """, (like,))
+            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
+            FROM products WHERE name LIKE ? %s ORDER BY expiration_date ASC, name ASC
+        """ % status_filter, [like] + params)
     else:
         cursor.execute("""
-            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
-            FROM products ORDER BY expiration_date ASC, name ASC
-        """)
+            SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
+            FROM products WHERE 1=1 %s ORDER BY expiration_date ASC, name ASC
+        """ % status_filter, params)
     rows = cursor.fetchall()
     conn.close()
     return {"cantidad": len(rows), "products": [_row_to_product(r) for r in rows]}
@@ -502,12 +521,59 @@ def abrir_producto_hoy(product_id: int):
     conn.commit()
 
     cursor.execute("""
-        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
         FROM products WHERE id = ?
     """, (product_id,))
     row = cursor.fetchone()
     conn.close()
     return {"status": "ok", "message": f"Producto abierto hoy ({today})", "product": _row_to_product(row)}
+
+@app.patch("/products/{product_id}/finish")
+def terminar_producto(product_id: int):
+    """Marca un producto como terminado/agotado (status='terminado', cantidad=0)."""
+    now_iso = datetime.datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_db()
+    cursor = conn.cursor()
+    # Primero verificar que exista
+    cursor.execute("SELECT id FROM products WHERE id = ?", (product_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    cursor.execute("""
+        UPDATE products SET status = 'terminado', quantity = 0, updated_at = ? WHERE id = ?
+    """, (now_iso, product_id))
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
+        FROM products WHERE id = ?
+    """, (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"status": "ok", "message": f"Producto marcado como terminado", "product": _row_to_product(row)}
+
+@app.patch("/products/{product_id}/reactivate")
+def reactivar_producto(product_id: int):
+    """Vuelve un producto terminado al estado activo (status='activo')."""
+    now_iso = datetime.datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM products WHERE id = ?", (product_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    cursor.execute("""
+        UPDATE products SET status = 'activo', updated_at = ? WHERE id = ?
+    """, (now_iso, product_id))
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
+        FROM products WHERE id = ?
+    """, (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"status": "ok", "message": "Producto reactivado", "product": _row_to_product(row)}
 
 @app.put("/products/{product_id}")
 def actualizar_producto(product_id: int, data: ProductUpdate):
@@ -517,17 +583,19 @@ def actualizar_producto(product_id: int, data: ProductUpdate):
 
     # Validaciones
     if "purchase_date" in updates:
-        _validate_date(updates["purchase_date"], "purchase_date")
+            _validate_date(updates["purchase_date"], "purchase_date")
     if "expiration_date" in updates:
-        _validate_date(updates["expiration_date"], "expiration_date")
+            _validate_date(updates["expiration_date"], "expiration_date")
     if updates.get("start_date"):
-        _validate_date(updates["start_date"], "start_date")
-    if "quantity" in updates and updates["quantity"] < 1:
-        raise HTTPException(status_code=400, detail="La cantidad debe ser al menos 1")
+            _validate_date(updates["start_date"], "start_date")
+    if "quantity" in updates and updates["quantity"] < 0:
+            raise HTTPException(status_code=400, detail="La cantidad no puede ser negativa")
     if "price" in updates and updates["price"] < 0:
-        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+            raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
     if "name" in updates and not updates["name"].strip():
-        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+            raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+    if "status" in updates and updates["status"] not in ("activo", "terminado"):
+            raise HTTPException(status_code=400, detail="status debe ser 'activo' o 'terminado'")
 
     updates["updated_at"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
 
@@ -543,7 +611,7 @@ def actualizar_producto(product_id: int, data: ProductUpdate):
     conn.commit()
 
     cursor.execute("""
-        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
         FROM products WHERE id = ?
     """, (product_id,))
     row = cursor.fetchone()
@@ -569,7 +637,7 @@ def buscar_producto_por_nombre(name: str):
     cursor = conn.cursor()
     like = f"%{name}%"
     cursor.execute("""
-        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, created_at, updated_at
+        SELECT id, name, quantity, price, purchase_date, start_date, expiration_date, status, created_at, updated_at
         FROM products WHERE name LIKE ? ORDER BY expiration_date ASC LIMIT 5
     """, (like,))
     rows = cursor.fetchall()
