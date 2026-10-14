@@ -128,6 +128,8 @@ export default function App() {
         commission: 40,
         myGain: 48.00,
         salongain: 72.00,
+        salon_id: 1,
+        salon_name: 'Vanidades',
         month: now.getMonth() + 1,
         year: now.getFullYear()
       }
@@ -148,7 +150,11 @@ export default function App() {
   const [regDate, setRegDate] = useState(todayYMD);
   const [regService, setRegService] = useState('');
   const [regPrice, setRegPrice] = useState('');
-  const [regCommission, setRegCommission] = useState(40); // 30 o 40
+  const [regCommission, setRegCommission] = useState(40); // % autocompletado (ajustable)
+
+  // Salones / estudios disponibles
+  const [salones, setSalones] = useState([]);
+  const [regSalonId, setRegSalonId] = useState(''); // obligatorio, sin selección por defecto
 
   // Estado para Modal de Edición
   const [editingService, setEditingService] = useState(null); // Objeto a editar
@@ -156,6 +162,7 @@ export default function App() {
   const [editService, setEditService] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editCommission, setEditCommission] = useState(40);
+  const [editSalonId, setEditSalonId] = useState('');
 
   // ============================================================
   // ESTADOS: MÓDULO DE PRODUCTOS / INVENTARIO
@@ -199,6 +206,7 @@ export default function App() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterSalon, setFilterSalon] = useState('todos'); // 'todos' | id del salón
   const [showCalendarWidget, setShowCalendarWidget] = useState(false);
   const [calViewDate, setCalViewDate] = useState(() => new Date());
 
@@ -219,6 +227,14 @@ export default function App() {
       }
     };
     fetchServices();
+  }, []);
+
+  // Cargar salones / estudios
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/salones`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setSalones(Array.isArray(data) ? data : []))
+      .catch(() => console.log('No se pudieron cargar los salones'));
   }, []);
 
   // Cargar productos cuando se activa la pestaña "productos"
@@ -242,6 +258,21 @@ export default function App() {
     return `Semana ${Math.ceil((date.getDate() + dayOfWeek) / 7)}`;
   };
 
+  // Auxiliares de salones y comisión sugerida
+  const salonById = (id) => salones.find((s) => s.id === Number(id));
+  const salonNombre = (id) => {
+    const s = salonById(id);
+    return s ? s.nombre : (id ? `Salón ${id}` : '—');
+  };
+  const esMaison = (id) => {
+    const s = salonById(id);
+    return s ? /maison/i.test(s.nombre) : Number(id) === 2;
+  };
+  const comisionSugerida = (salonId, servicio) => {
+    if (esMaison(salonId)) return 60; // Maison Studio: solo Maquillaje
+    return /maquillaje/i.test((servicio || '').trim()) ? 40 : 30; // Vanidades
+  };
+
   // Cálculos en vivo (Nuevo Registro)
   const livePrice = parseFloat(regPrice) || 0;
   const liveMyGain = livePrice * (regCommission / 100);
@@ -252,9 +283,44 @@ export default function App() {
   const editLiveMyGain = editLivePrice * (editCommission / 100);
   const editLiveSalonGain = editLivePrice - editLiveMyGain;
 
+  // Cambio de salón en el formulario: recalcula comisión y, en Maison, fuerza Maquillaje
+  const handleRegSalonChange = (val) => {
+    setRegSalonId(val);
+    if (esMaison(val)) {
+      setRegService('Maquillaje');
+      setRegCommission(60);
+    } else {
+      setRegCommission(comisionSugerida(val, regService));
+    }
+  };
+  const handleRegServiceChange = (val) => {
+    setRegService(val);
+    if (!esMaison(regSalonId)) {
+      setRegCommission(comisionSugerida(regSalonId, val));
+    }
+  };
+
+  // Cambio de salón / servicio en el modal de edición
+  const handleEditSalonChange = (val) => {
+    setEditSalonId(val);
+    if (esMaison(val)) {
+      setEditService('Maquillaje');
+      setEditCommission(60);
+    } else {
+      setEditCommission(comisionSugerida(val, editService));
+    }
+  };
+  const handleEditServiceChange = (val) => {
+    setEditService(val);
+    if (!esMaison(editSalonId)) {
+      setEditCommission(comisionSugerida(editSalonId, val));
+    }
+  };
+
   // Envío nuevo servicio
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!regSalonId) { showToast('Selecciona el salón/estudio', 'error'); return; }
     if (!regService.trim()) return;
     const priceNum = parseFloat(regPrice);
     if (isNaN(priceNum) || priceNum <= 0) return;
@@ -276,6 +342,8 @@ export default function App() {
       commission: commNum,
       myGain: myGain,
       salongain: salongain,
+      salon_id: Number(regSalonId),
+      salon_name: salonNombre(regSalonId),
       month: sMonth,
       year: sYear
     };
@@ -288,7 +356,8 @@ export default function App() {
           fecha: regDate,
           servicio_nombre: regService.trim(),
           precio: priceNum,
-          porcentaje: commNum
+          porcentaje: commNum,
+          salon_id: Number(regSalonId)
         })
       });
       if (res.ok) {
@@ -314,12 +383,14 @@ export default function App() {
     setEditService(item.service);
     setEditPrice(item.price.toString());
     setEditCommission(item.commission || 40);
+    setEditSalonId(item.salon_id ?? '');
   };
 
   // Guardar edición de servicio
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editingService || !editService.trim()) return;
+    if (!editSalonId) { showToast('Selecciona el salón/estudio', 'error'); return; }
     const priceNum = parseFloat(editPrice);
     if (isNaN(priceNum) || priceNum <= 0) return;
 
@@ -340,6 +411,8 @@ export default function App() {
       commission: commNum,
       myGain: myGain,
       salongain: salongain,
+      salon_id: Number(editSalonId),
+      salon_name: salonNombre(editSalonId),
       month: sMonth,
       year: sYear
     };
@@ -352,7 +425,8 @@ export default function App() {
           fecha: editDate,
           servicio_nombre: editService.trim(),
           precio: priceNum,
-          porcentaje: commNum
+          porcentaje: commNum,
+          salon_id: Number(editSalonId)
         })
       });
     } catch (err) {
@@ -617,6 +691,8 @@ export default function App() {
   const gain40 = monthlyServices.filter((s) => s.commission === 40).reduce((acc, curr) => acc + curr.myGain, 0);
   const count30 = monthlyServices.filter((s) => s.commission === 30).length;
   const gain30 = monthlyServices.filter((s) => s.commission === 30).reduce((acc, curr) => acc + curr.myGain, 0);
+  const count60 = monthlyServices.filter((s) => s.commission === 60).length;
+  const gain60 = monthlyServices.filter((s) => s.commission === 60).reduce((acc, curr) => acc + curr.myGain, 0);
   const ticketPromedio = monthlyServices.length > 0 ? monthFacturado / monthlyServices.length : 0;
 
   const isViewingCurrentMonth = (now.getMonth() + 1 === selectedDashboardMonth) && (now.getFullYear() === selectedDashboardYear);
@@ -631,9 +707,10 @@ export default function App() {
       const matchSearch = searchTerm.trim() 
         ? item.service.toLowerCase().includes(searchTerm.toLowerCase())
         : true;
-      return matchFrom && matchTo && matchSearch;
+      const matchSalon = filterSalon === 'todos' || Number(item.salon_id) === Number(filterSalon);
+      return matchFrom && matchTo && matchSearch && matchSalon;
     });
-  }, [services, filterFrom, filterTo, searchTerm]);
+  }, [services, filterFrom, filterTo, searchTerm, filterSalon]);
 
   // Paginación en la sección de Informes e Historial (5 registros por página)
   const [reportPage, setReportPage] = useState(1);
@@ -642,7 +719,7 @@ export default function App() {
   // Reiniciar a la primera página cuando cambian los filtros de búsqueda o fecha
   useEffect(() => {
     setReportPage(1);
-  }, [filterFrom, filterTo, searchTerm]);
+  }, [filterFrom, filterTo, searchTerm, filterSalon]);
 
   const totalReportPages = Math.max(1, Math.ceil(filteredServices.length / itemsPerPage));
   const paginatedServices = useMemo(() => {
@@ -692,6 +769,34 @@ export default function App() {
       setFilterFrom('');
       setFilterTo('');
     }
+  };
+
+  // Exportar el conjunto filtrado a CSV (liquidación limpia por salón)
+  const handleExportCSV = () => {
+    if (filteredServices.length === 0) return;
+    const rows = [['Fecha', 'Semana', 'Servicio', 'Salón', 'Cobrado (S/)', 'Comisión (%)', 'Mi Ganancia', 'Ganancia Salón']];
+    filteredServices.forEach((item) => {
+      rows.push([
+        item.date,
+        item.week || getWeekOfMonth(item.date),
+        item.service,
+        salonNombre(item.salon_id),
+        item.price.toFixed(2),
+        String(item.commission),
+        item.myGain.toFixed(2),
+        item.salongain.toFixed(2)
+      ]);
+    });
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const salonLabel = filterSalon === 'todos' ? 'Todos' : salonNombre(filterSalon);
+    a.download = `servicios_${salonLabel.replace(/\s+/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV exportado con el filtro actual', 'info');
   };
 
   // Mini Calendario
@@ -1129,7 +1234,7 @@ export default function App() {
                       <h3 className="font-extrabold text-base sm:text-lg text-[#1e1e1c]">
                         Comisiones del Mes
                       </h3>
-                      <p className="text-xs text-[#8c8884]">40% estándar vs 30% salón</p>
+                      <p className="text-xs text-[#8c8884]">40% Maquillaje · 30% otros · 60% Maison</p>
                     </div>
                   </div>
 
@@ -1167,6 +1272,24 @@ export default function App() {
                       </div>
                       <span className="text-xs font-extrabold bg-white text-[#1e1e1c] px-2.5 py-1 rounded-xl border border-[#e5e1da] shadow-2xs">
                         {count30} serv.
+                      </span>
+                    </div>
+
+                    {/* Tarjeta 60% (Maison Studio) */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-[#fdebdd]/80 to-white border border-[#edd5b6] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-gold text-white font-black text-sm flex items-center justify-center shadow-xs">
+                          60%
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#6b6764]">Servicios al 60% (Maison)</div>
+                          <div className="text-lg font-black text-[#1e1e1c]">
+                            S/ {gain60.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold bg-white text-[#b8860b] px-2.5 py-1 rounded-xl border border-[#edd5b6] shadow-2xs">
+                        {count60} serv.
                       </span>
                     </div>
 
@@ -1223,6 +1346,7 @@ export default function App() {
                       <th className="p-3.5">Fecha</th>
                       <th className="p-3.5">Semana</th>
                       <th className="p-3.5">Servicio Realizado</th>
+                      <th className="p-3.5">Salón</th>
                       <th className="p-3.5">Cobrado (S/)</th>
                       <th className="p-3.5">Comisión</th>
                       <th className="p-3.5">Mi Ganancia</th>
@@ -1237,6 +1361,11 @@ export default function App() {
                           <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
                           <td className="p-3.5 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
                           <td className="p-3.5 whitespace-nowrap font-extrabold text-[#1e1e1c]">{item.service}</td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
+                              {salonNombre(item.salon_id)}
+                            </span>
+                          </td>
                           <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</td>
                           <td className="p-3.5 whitespace-nowrap">
                             <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${
@@ -1277,7 +1406,7 @@ export default function App() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="p-10 text-center text-[#8c8884]">
+                        <td colSpan="9" className="p-10 text-center text-[#8c8884]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Sparkles className="w-8 h-8 text-[#ec71a8]/40" />
                             <span className="font-extrabold text-[#1e1e1c]">
@@ -1341,8 +1470,27 @@ export default function App() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+
+                  {/* 0. SALÓN / ESTUDIO (obligatorio) */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <Store className="w-4 h-4 text-[#ec71a8]" />
+                      Salón / Estudio
+                    </label>
+                    <select
+                      value={regSalonId}
+                      onChange={(e) => handleRegSalonChange(e.target.value)}
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      required
+                    >
+                      <option value="" disabled>Selecciona un salón...</option>
+                      {salones.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* 1. FECHA */}
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
@@ -1358,7 +1506,7 @@ export default function App() {
                     />
                   </div>
 
-                  {/* 2. NOMBRE DEL SERVICIO */}
+                  {/* 2. SERVICIO REALIZADO */}
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-[#ec71a8]" />
@@ -1368,11 +1516,16 @@ export default function App() {
                       type="text"
                       placeholder="Ej. Maquillaje Social, Novia, Pestañas..."
                       value={regService}
-                      onChange={(e) => setRegService(e.target.value)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      onChange={(e) => handleRegServiceChange(e.target.value)}
+                      disabled={esMaison(regSalonId)}
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                       required
-                      autoFocus
                     />
+                    {esMaison(regSalonId) && (
+                      <span className="text-[10px] font-bold text-[#ec71a8]">
+                        Maison Studio solo permite Maquillaje
+                      </span>
+                    )}
                   </div>
 
                   {/* 3. PRECIO COBRADO */}
@@ -1393,39 +1546,27 @@ export default function App() {
                     />
                   </div>
 
-                  {/* 4. SELECTOR DE COMISIÓN (30% vs 40%) */}
+                  {/* 4. COMISIÓN (autocompletada, ajustable) */}
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <Percent className="w-4 h-4 text-[#ec71a8]" />
                       Comisión (% Mi Ganancia)
                     </label>
-                    <div className="grid grid-cols-2 gap-2 h-[48px]">
-                      <button
-                        type="button"
-                        onClick={() => setRegCommission(30)}
-                        className={`flex items-center justify-center gap-1.5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer border ${
-                          regCommission === 30
-                            ? 'bg-[#1e1e1c] text-[#ecc880] border-[#1e1e1c] shadow-md'
-                            : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
-                        }`}
-                      >
-                        {regCommission === 30 && <Check className="w-4 h-4 stroke-[3]" />}
-                        30% Salón
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRegCommission(40)}
-                        className={`flex items-center justify-center gap-1.5 rounded-2xl font-extrabold text-sm transition-all cursor-pointer border ${
-                          regCommission === 40
-                            ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-md shadow-[#ec71a8]/25'
-                            : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
-                        }`}
-                      >
-                        {regCommission === 40 && <Check className="w-4 h-4 stroke-[3]" />}
-                        40% Regular
-                      </button>
-                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={regCommission}
+                      onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
+                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      required
+                    />
+                    <span className="text-[10px] font-semibold text-[#8c8884]">
+                      {esMaison(regSalonId)
+                        ? 'Auto: Maison Studio · Maquillaje 60%'
+                        : 'Auto: Maquillaje 40% · otros servicios 30%'}
+                    </span>
                   </div>
 
                 </div>
@@ -1538,6 +1679,37 @@ export default function App() {
                 </div>
               </div>
 
+              {/* FILTRO POR SALÓN / ESTUDIO */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-[#6b6764] flex items-center gap-1.5">
+                  <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Salón:
+                </span>
+                <button
+                  onClick={() => setFilterSalon('todos')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
+                    filterSalon === 'todos'
+                      ? 'bg-[#1e1e1c] text-white border-[#1e1e1c] shadow-sm'
+                      : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
+                  }`}
+                >
+                  Todos
+                </button>
+                {salones.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setFilterSalon(String(s.id))}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
+                      filterSalon === String(s.id)
+                        ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-sm'
+                        : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
+                    }`}
+                  >
+                    {s.nombre}
+                  </button>
+                ))}
+              </div>
+
               {/* INPUTS DE FILTRO */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div className="flex flex-col gap-1.5">
@@ -1591,9 +1763,9 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {(filterFrom || filterTo || searchTerm) && (
+                  {(filterFrom || filterTo || searchTerm || filterSalon !== 'todos') && (
                     <button
-                      onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); }}
+                      onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); }}
                       className="w-full p-3 bg-[#fce3ed] hover:bg-[#f9cee3] text-[#ec71a8] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1716,6 +1888,14 @@ export default function App() {
                     Puedes editar los datos o eliminar registros directamente desde la columna de acciones
                   </p>
                 </div>
+                <button
+                  onClick={handleExportCSV}
+                  disabled={filteredServices.length === 0}
+                  className="px-4 py-2 rounded-xl bg-[#1e1e1c] text-[#ecc880] hover:bg-[#2c2b28] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Exportar CSV
+                </button>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-[#fce3ed]">
@@ -1725,6 +1905,7 @@ export default function App() {
                       <th className="p-4">Fecha</th>
                       <th className="p-4">Semana</th>
                       <th className="p-4">Servicio</th>
+                      <th className="p-4">Salón</th>
                       <th className="p-4">Precio Total</th>
                       <th className="p-4">Comisión</th>
                       <th className="p-4">Mi Ganancia</th>
@@ -1740,6 +1921,11 @@ export default function App() {
                           <td className="p-4 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
                           <td className="p-4 whitespace-nowrap font-extrabold text-[#1e1e1c]">
                             {item.service}
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
+                              {salonNombre(item.salon_id)}
+                            </span>
                           </td>
                           <td className="p-4 whitespace-nowrap font-bold text-[#1e1e1c]">
                             S/ {item.price.toFixed(2)}
@@ -1788,12 +1974,12 @@ export default function App() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="p-10 text-center text-[#8c8884]">
+                        <td colSpan="9" className="p-10 text-center text-[#8c8884]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertCircle className="w-8 h-8 text-[#ec71a8]/40" />
                             <span className="font-bold text-[#1e1e1c]">No se encontraron servicios en el filtro seleccionado.</span>
                             <button
-                              onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); }}
+                              onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); }}
                               className="mt-2 text-xs text-[#ec71a8] font-extrabold hover:underline cursor-pointer"
                             >
                               Restablecer todos los filtros
@@ -2193,6 +2379,25 @@ export default function App() {
             {/* FORMULARIO DE EDICIÓN */}
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-5">
               
+              {/* SALÓN / ESTUDIO */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Salón / Estudio
+                </label>
+                <select
+                  value={editSalonId}
+                  onChange={(e) => handleEditSalonChange(e.target.value)}
+                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  required
+                >
+                  <option value="" disabled>Selecciona un salón...</option>
+                  {salones.map((s) => (
+                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* FECHA */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
@@ -2217,10 +2422,16 @@ export default function App() {
                 <input
                   type="text"
                   value={editService}
-                  onChange={(e) => setEditService(e.target.value)}
-                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  onChange={(e) => handleEditServiceChange(e.target.value)}
+                  disabled={esMaison(editSalonId)}
+                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8] disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                   required
                 />
+                {esMaison(editSalonId) && (
+                  <span className="text-[10px] font-bold text-[#ec71a8]">
+                    Maison Studio solo permite Maquillaje
+                  </span>
+                )}
               </div>
 
               {/* PRECIO Y COMISIÓN */}
@@ -2246,30 +2457,16 @@ export default function App() {
                     <Percent className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Comisión
                   </label>
-                  <div className="grid grid-cols-2 gap-2 h-[48px]">
-                    <button
-                      type="button"
-                      onClick={() => setEditCommission(30)}
-                      className={`flex items-center justify-center gap-1 rounded-2xl font-bold text-xs cursor-pointer border ${
-                        editCommission === 30
-                          ? 'bg-[#1e1e1c] text-[#ecc880] border-[#1e1e1c] shadow-sm'
-                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
-                      }`}
-                    >
-                      30% Salón
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditCommission(40)}
-                      className={`flex items-center justify-center gap-1 rounded-2xl font-bold text-xs cursor-pointer border ${
-                        editCommission === 40
-                          ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-sm'
-                          : 'bg-white text-[#6b6764] border-[#f9cee3]'
-                      }`}
-                    >
-                      40% Regular
-                    </button>
-                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={editCommission}
+                    onChange={(e) => setEditCommission(Number(e.target.value) || 0)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    required
+                  />
                 </div>
               </div>
 

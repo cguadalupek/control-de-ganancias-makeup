@@ -46,6 +46,21 @@ def init_db():
         )
     """)
     
+    # Tabla de salones / establecimientos donde trabaja la maquilladora
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS salones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL UNIQUE
+        )
+    """)
+    # Precargar los salones con IDs estables (1=Vanidades, 2=Maison Studio)
+    cursor.execute("SELECT COUNT(*) FROM salones")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            "INSERT INTO salones (id, nombre) VALUES (?, ?)",
+            [(1, "Vanidades"), (2, "Maison Studio")]
+        )
+
     # Tabla de registros de servicios realizados
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS registro_servicios (
@@ -58,9 +73,16 @@ def init_db():
             ganancia_salon REAL NOT NULL,
             semana INTEGER NOT NULL,
             mes INTEGER NOT NULL,
-            anio INTEGER NOT NULL
+            anio INTEGER NOT NULL,
+            salon_id INTEGER NOT NULL DEFAULT 1
         )
     """)
+    # Migración: agregar salon_id a tablas preexistentes (historial previo => Vanidades, id 1)
+    cursor.execute("PRAGMA table_info(registro_servicios)")
+    reg_cols = [row[1] for row in cursor.fetchall()]
+    if "salon_id" not in reg_cols:
+        cursor.execute("ALTER TABLE registro_servicios ADD COLUMN salon_id INTEGER NOT NULL DEFAULT 1")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_registro_salon ON registro_servicios(salon_id)")
     
     # Tabla de metas del mes
     cursor.execute("""
@@ -140,6 +162,7 @@ class ServicioCreate(BaseModel):
     servicio_nombre: str
     precio: float
     porcentaje: float  # e.g. 0.30 o 0.40 o 30 o 40
+    salon_id: int
 
 class MetaUpdate(BaseModel):
     anio: int
@@ -173,6 +196,14 @@ def calcular_semana_mes(fecha_obj: datetime.date) -> int:
     semana = math.ceil((dia_del_mes + primer_dia.weekday()) / 7)
     return min(semana, 5)
 
+def salon_nombre(salon_id: int) -> Optional[str]:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT nombre FROM salones WHERE id = ?", (salon_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["nombre"] if row else None
+
 # Endpoints API
 @app.get("/catalogo")
 def obtener_catalogo():
@@ -183,25 +214,42 @@ def obtener_catalogo():
     conn.close()
     return [{"id": r["id"], "nombre": r["nombre"], "precio_defecto": r["precio_defecto"], "porcentaje_defecto": r["porcentaje_defecto"]} for r in rows]
 
+@app.get("/salones")
+def obtener_salones():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nombre FROM salones ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r["id"], "nombre": r["nombre"]} for r in rows]
+
 @app.get("/servicios")
-def listar_servicios(desde: Optional[str] = Query(None), hasta: Optional[str] = Query(None)):
+def listar_servicios(desde: Optional[str] = Query(None), hasta: Optional[str] = Query(None),
+                     salon_id: Optional[int] = Query(None)):
     conn = get_db()
     cursor = conn.cursor()
     
-    query = "SELECT id, fecha, servicio_nombre, precio, porcentaje, ganancia_personal, ganancia_salon, semana, mes, anio FROM registro_servicios"
+    query = """
+        SELECT r.id, r.fecha, r.servicio_nombre, r.precio, r.porcentaje, r.ganancia_personal,
+               r.ganancia_salon, r.semana, r.mes, r.anio, r.salon_id,
+               COALESCE(s.nombre, 'Vanidades') AS salon_nombre
+        FROM registro_servicios r
+        LEFT JOIN salones s ON s.id = r.salon_id
+    """
+    conditions = []
     params = []
-    
-    if desde and hasta:
-        query += " WHERE fecha >= ? AND fecha <= ?"
-        params.extend([desde, hasta])
-    elif desde:
-        query += " WHERE fecha >= ?"
+    if desde:
+        conditions.append("r.fecha >= ?")
         params.append(desde)
-    elif hasta:
-        query += " WHERE fecha <= ?"
+    if hasta:
+        conditions.append("r.fecha <= ?")
         params.append(hasta)
-        
-    query += " ORDER BY fecha DESC, id DESC"
+    if salon_id is not None:
+        conditions.append("r.salon_id = ?")
+        params.append(salon_id)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY r.fecha DESC, r.id DESC"
     cursor.execute(query, params)
     rows = cursor.fetchall()
     
@@ -226,6 +274,8 @@ def listar_servicios(desde: Optional[str] = Query(None), hasta: Optional[str] = 
             "commission": pct_display,
             "myGain": r["ganancia_personal"],
             "salongain": r["ganancia_salon"],
+            "salon_id": r["salon_id"],
+            "salon_name": r["salon_nombre"],
             "month": r["mes"],
             "year": r["anio"]
         })
@@ -254,14 +304,19 @@ def registrar_servicio(data: ServicioCreate):
     ganancia_personal = round(data.precio * pct_decimal, 2)
     ganancia_salon = round(data.precio - ganancia_personal, 2)
 
+    # Validar que el salón exista
+    nombre_salon = salon_nombre(data.salon_id)
+    if not nombre_salon:
+        raise HTTPException(status_code=400, detail="Salón/estudio no válido")
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO registro_servicios 
-        (fecha, servicio_nombre, precio, porcentaje, ganancia_personal, ganancia_salon, semana, mes, anio)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (fecha, servicio_nombre, precio, porcentaje, ganancia_personal, ganancia_salon, semana, mes, anio, salon_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data.fecha, data.servicio_nombre.strip(), data.precio, pct_decimal, 
-          ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year))
+          ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year, data.salon_id))
     new_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -275,6 +330,8 @@ def registrar_servicio(data: ServicioCreate):
         "commission": pct_display,
         "myGain": ganancia_personal,
         "salongain": ganancia_salon,
+        "salon_id": data.salon_id,
+        "salon_name": nombre_salon,
         "month": fecha_obj.month,
         "year": fecha_obj.year
     }
@@ -301,15 +358,20 @@ def actualizar_servicio(id: int, data: ServicioCreate):
     ganancia_personal = round(data.precio * pct_decimal, 2)
     ganancia_salon = round(data.precio - ganancia_personal, 2)
 
+    # Validar que el salón exista
+    nombre_salon = salon_nombre(data.salon_id)
+    if not nombre_salon:
+        raise HTTPException(status_code=400, detail="Salón/estudio no válido")
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE registro_servicios 
         SET fecha = ?, servicio_nombre = ?, precio = ?, porcentaje = ?, 
-            ganancia_personal = ?, ganancia_salon = ?, semana = ?, mes = ?, anio = ?
+            ganancia_personal = ?, ganancia_salon = ?, semana = ?, mes = ?, anio = ?, salon_id = ?
         WHERE id = ?
     """, (data.fecha, data.servicio_nombre.strip(), data.precio, pct_decimal, 
-          ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year, id))
+          ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year, data.salon_id, id))
     updated = cursor.rowcount
     conn.commit()
     conn.close()
@@ -326,6 +388,8 @@ def actualizar_servicio(id: int, data: ServicioCreate):
         "commission": pct_display,
         "myGain": ganancia_personal,
         "salongain": ganancia_salon,
+        "salon_id": data.salon_id,
+        "salon_name": nombre_salon,
         "month": fecha_obj.month,
         "year": fecha_obj.year
     }
