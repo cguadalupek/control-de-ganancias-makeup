@@ -32,9 +32,21 @@
   .font-serif-luxury {
     font-family: 'Playfair Display', serif;
   }
+
+  /* Selects con apariencia de marca (chevron rosa, sin flecha nativa) */
+  .select-brand {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ec71a8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 1rem;
+    padding-right: 2.6rem;
+  }
 }
 
-/* Custom scrollbar */
+/* Scrollbar custom */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;

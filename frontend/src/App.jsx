@@ -58,18 +58,11 @@ function BrandLogo({ compact = false }) {
           
           {/* Vector SVG monograma GR estilizado con pincel y corazón */}
           <svg className="w-8 h-8 text-[#ecc880] relative z-10 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M42 28 C28 28, 22 40, 22 52 C22 66, 32 76, 48 76 C60 76, 68 70, 72 62 L64 58 C60 64, 55 68, 48 68 C37 68, 30 60, 30 52 C30 44, 35 36, 43 36 C52 36, 56 42, 57 48 L65 48 C64 36, 56 28, 42 28 Z" fill="url(#goldGrad)" />
-            <path d="M50 48 H72 C77 48, 80 52, 80 56 C80 61, 76 64, 71 64 L65 64 L74 76 H64 L56 64 H56" stroke="url(#goldGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M42 28 C28 28, 22 40, 22 52 C22 66, 32 76, 48 76 C60 76, 68 70, 72 62 L64 58 C60 64, 55 68, 48 68 C37 68, 30 60, 30 52 C30 44, 35 36, 43 36 C52 36, 56 42, 57 48 L65 48 C64 36, 56 28, 42 28 Z" fill="#ecc880" />
+            <path d="M50 48 H72 C77 48, 80 52, 80 56 C80 61, 76 64, 71 64 L65 64 L74 76 H64 L56 64 H56" stroke="#d4af37" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             {/* Corazón / Detalle de brillo Make Up */}
             <path d="M74 34 C72 30, 68 30, 66 33 C64 30, 60 30, 58 34 C58 39, 66 45, 66 45 C66 45, 74 39, 74 34 Z" fill="#ec71a8" />
             <circle cx="78" cy="26" r="2.5" fill="#f9cee3" />
-            <defs>
-              <linearGradient id="goldGrad" x1="20" y1="20" x2="85" y2="85" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#fdf0cd" />
-                <stop offset="0.5" stopColor="#d4af37" />
-                <stop offset="1" stopColor="#aa7c11" />
-              </linearGradient>
-            </defs>
           </svg>
         </div>
       </div>
@@ -207,6 +200,7 @@ export default function App() {
   const [filterTo, setFilterTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSalon, setFilterSalon] = useState('todos'); // 'todos' | id del salón
+  const [quickRange, setQuickRange] = useState('all'); // preselección del dropdown de rango
   const [showCalendarWidget, setShowCalendarWidget] = useState(false);
   const [calViewDate, setCalViewDate] = useState(() => new Date());
 
@@ -765,10 +759,16 @@ export default function App() {
       const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
       setFilterFrom(toYMD(firstDay));
       setFilterTo(toYMD(lastDay));
+    } else if (type === 'year') {
+      const firstDay = new Date(today.getFullYear(), 0, 1);
+      const lastDay = new Date(today.getFullYear(), 11, 31);
+      setFilterFrom(toYMD(firstDay));
+      setFilterTo(toYMD(lastDay));
     } else if (type === 'all') {
       setFilterFrom('');
       setFilterTo('');
     }
+    setQuickRange(type);
   };
 
   // Exportar el conjunto filtrado a CSV (liquidación limpia por salón)
@@ -797,6 +797,71 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
     showToast('CSV exportado con el filtro actual', 'info');
+  };
+
+  // Exportar a Excel (.xls HTML) con la marca GUADALUPE MAKE UP
+  const handleExportExcel = () => {
+    if (filteredServices.length === 0) return;
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const salonLabel = filterSalon === 'todos' ? 'Todos' : salonNombre(filterSalon);
+
+    const dataRows = filteredServices.map((item) => `
+      <tr>
+        <td style="text-align:center;border:1px solid #e5e1da;">${item.date}</td>
+        <td style="text-align:center;border:1px solid #e5e1da;">${item.week || getWeekOfMonth(item.date)}</td>
+        <td style="border:1px solid #e5e1da;">${esc(item.service)}</td>
+        <td style="border:1px solid #e5e1da;">${esc(salonNombre(item.salon_id))}</td>
+        <td style="text-align:right;border:1px solid #e5e1da;">${item.price.toFixed(2)}</td>
+        <td style="text-align:center;border:1px solid #e5e1da;">${item.commission}%</td>
+        <td style="text-align:right;border:1px solid #e5e1da;color:#ec71a8;font-weight:bold;">${item.myGain.toFixed(2)}</td>
+        <td style="text-align:right;border:1px solid #e5e1da;">${item.salongain.toFixed(2)}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<table border="0" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+  <tr>
+    <td colspan="8" style="background:#1e1e1c;color:#ffffff;font-size:16pt;font-weight:bold;padding:12px;">
+      GUADALUPE MAKE UP <span style="color:#ec71a8;">Rodriguez</span>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="8" style="background:#fce3ed;color:#1e1e1c;font-size:11pt;padding:8px;">
+      <b>Informe de Servicios</b> &nbsp;·&nbsp; Salón: <b>${esc(salonLabel)}</b> &nbsp;·&nbsp; ${filteredServices.length} servicios &nbsp;·&nbsp; Facturado: <b>S/ ${reportTotalFacturado.toFixed(2)}</b>
+    </td>
+  </tr>
+  <tr>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:center;">Fecha</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:center;">Semana</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;">Servicio</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;">Salón</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:right;">Cobrado (S/)</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:center;">Comisión</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:right;">Mi Ganancia</th>
+    <th style="background:#d4af37;color:#1e1e1c;border:1px solid #aa7c11;text-align:right;">Ganancia Salón</th>
+  </tr>
+  ${dataRows}
+  <tr>
+    <td colspan="4" style="background:#f5f3ef;font-weight:bold;text-align:right;border:1px solid #e5e1da;">TOTALES</td>
+    <td style="background:#f5f3ef;font-weight:bold;text-align:right;border:1px solid #e5e1da;">S/ ${reportTotalFacturado.toFixed(2)}</td>
+    <td style="background:#f5f3ef;border:1px solid #e5e1da;"></td>
+    <td style="background:#f5f3ef;font-weight:bold;text-align:right;border:1px solid #e5e1da;color:#ec71a8;">S/ ${reportTotalMyGain.toFixed(2)}</td>
+    <td style="background:#f5f3ef;font-weight:bold;text-align:right;border:1px solid #e5e1da;">S/ ${reportTotalSalonGain.toFixed(2)}</td>
+  </tr>
+</table>
+</body>
+</html>`;
+
+    const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `informe_${salonLabel.replace(/\s+/g, '_')}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Excel exportado con el filtro actual', 'info');
   };
 
   // Mini Calendario
@@ -1073,7 +1138,7 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-in fade-in duration-300">
             
             {/* TARJETAS PRINCIPALES DEL MES */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               
               {/* 1. MI GANANCIA NETA DEL MES */}
               <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
@@ -1093,26 +1158,6 @@ export default function App() {
                   <div className="mt-2.5 text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ec71a8]"></span>
                     {monthGoalProgressPct}% alcanzado de la meta mensual
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. GANANCIA SALÓN DEL MES */}
-              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#6b6764] bg-[#f5f3ef] px-3 py-1 rounded-lg border border-[#e5e1da]">
-                    Ganancia Salón
-                  </span>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#1e1e1c] to-[#3a3936] text-[#ecc880] flex items-center justify-center shadow-md">
-                    <Store className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="mt-5">
-                  <div className="text-3xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight">
-                    S/ {monthSalonGain.toFixed(2)}
-                  </div>
-                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764]">
-                    Local, insumos y mantenimiento
                   </div>
                 </div>
               </div>
@@ -1538,7 +1583,7 @@ export default function App() {
                     <select
                       value={regSalonId}
                       onChange={(e) => handleRegSalonChange(e.target.value)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      className="select-brand p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     >
                       <option value="" disabled>Selecciona un salón...</option>
@@ -1692,79 +1737,54 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* BOTONES DE FILTRO RÁPIDO */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => handleQuickFilter('today')}
-                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                  >
-                    Hoy
-                  </button>
-                  <button
-                    onClick={() => handleQuickFilter('week')}
-                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                  >
-                    Esta Semana
-                  </button>
-                  <button
-                    onClick={() => handleQuickFilter('month')}
-                    className="px-3.5 py-2 bg-[#fce3ed] text-[#ec71a8] hover:bg-[#f9cee3] border border-[#f9cee3] rounded-xl text-xs font-black transition-all shadow-2xs cursor-pointer"
-                  >
-                    Este Mes
-                  </button>
-                  <button
-                    onClick={() => handleQuickFilter('last_month')}
-                    className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] border border-[#f9cee3] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                  >
-                    Mes Anterior
-                  </button>
-                  <button
-                    onClick={() => handleQuickFilter('all')}
-                    className="px-3.5 py-2 bg-[#f5f3ef] hover:bg-[#e5e1da] border border-[#e5e1da] rounded-xl text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Todo el Histórico
-                  </button>
-                  <button
-                    onClick={() => setShowCalendarWidget(!showCalendarWidget)}
-                    className={`px-3.5 py-2 border rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
-                      showCalendarWidget ? 'bg-[#ec71a8] text-white border-[#ec71a8] shadow-sm' : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
-                    }`}
-                  >
-                    <CalendarIcon className="w-3.5 h-3.5" />
-                    {showCalendarWidget ? 'Ocultar Calendario' : 'Calendario Visual'}
-                  </button>
+                {/* FILTRO DE RANGO (dropdown) + contador de servicios */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={quickRange}
+                      onChange={(e) => handleQuickFilter(e.target.value)}
+                      className="select-brand px-4 py-2.5 rounded-2xl border border-[#f9cee3] bg-white text-sm font-bold text-[#1e1e1c] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 cursor-pointer"
+                    >
+                      <option value="all">Todo el Histórico</option>
+                      <option value="today">Hoy</option>
+                      <option value="week">Esta Semana</option>
+                      <option value="month">Este Mes</option>
+                      <option value="last_month">Mes Anterior</option>
+                      <option value="year">Este Año</option>
+                      {quickRange === 'custom' && <option value="custom">Rango personalizado</option>}
+                    </select>
+                    <button
+                      onClick={() => setShowCalendarWidget(!showCalendarWidget)}
+                      className={`px-3.5 py-2 border rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        showCalendarWidget ? 'bg-[#ec71a8] text-white border-[#ec71a8] shadow-sm' : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
+                      }`}
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      {showCalendarWidget ? 'Ocultar Calendario' : 'Calendario Visual'}
+                    </button>
+                  </div>
+                  <span className="text-xs font-black bg-[#fce3ed] text-[#ec71a8] px-3.5 py-2 rounded-xl border border-[#f9cee3] whitespace-nowrap">
+                    {filteredServices.length} {filteredServices.length === 1 ? 'servicio' : 'servicios'}
+                  </span>
                 </div>
               </div>
 
-              {/* FILTRO POR SALÓN / ESTUDIO */}
-              <div className="flex flex-wrap items-center gap-2">
+              {/* FILTRO POR SALÓN / ESTUDIO (dropdown) */}
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-bold text-[#6b6764] flex items-center gap-1.5">
                   <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
                   Salón:
                 </span>
-                <button
-                  onClick={() => setFilterSalon('todos')}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
-                    filterSalon === 'todos'
-                      ? 'bg-[#1e1e1c] text-white border-[#1e1e1c] shadow-sm'
-                      : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
-                  }`}
+                <select
+                  value={filterSalon}
+                  onChange={(e) => setFilterSalon(e.target.value)}
+                  className="select-brand px-4 py-2.5 rounded-2xl border border-[#f9cee3] bg-white text-sm font-bold text-[#1e1e1c] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 cursor-pointer"
                 >
-                  Todos
-                </button>
-                {salones.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setFilterSalon(String(s.id))}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
-                      filterSalon === String(s.id)
-                        ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white border-[#ec71a8] shadow-sm'
-                        : 'bg-white text-[#6b6764] border-[#f9cee3] hover:bg-[#fce3ed]/50'
-                    }`}
-                  >
-                    {s.nombre}
-                  </button>
-                ))}
+                  <option value="todos">Todos</option>
+                  {salones.map((s) => (
+                    <option key={s.id} value={String(s.id)}>{s.nombre}</option>
+                  ))}
+                </select>
               </div>
 
               {/* INPUTS DE FILTRO */}
@@ -1777,7 +1797,7 @@ export default function App() {
                   <input
                     type="date"
                     value={filterFrom}
-                    onChange={(e) => setFilterFrom(e.target.value)}
+                    onChange={(e) => { setFilterFrom(e.target.value); setQuickRange('custom'); }}
                     className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                   />
                 </div>
@@ -1790,7 +1810,7 @@ export default function App() {
                   <input
                     type="date"
                     value={filterTo}
-                    onChange={(e) => setFilterTo(e.target.value)}
+                    onChange={(e) => { setFilterTo(e.target.value); setQuickRange('custom'); }}
                     className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                   />
                 </div>
@@ -1822,7 +1842,7 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   {(filterFrom || filterTo || searchTerm || filterSalon !== 'todos') && (
                     <button
-                      onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); }}
+                      onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); setQuickRange('all'); }}
                       className="w-full p-3 bg-[#fce3ed] hover:bg-[#f9cee3] text-[#ec71a8] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1945,14 +1965,24 @@ export default function App() {
                     Puedes editar los datos o eliminar registros directamente desde la columna de acciones
                   </p>
                 </div>
-                <button
-                  onClick={handleExportCSV}
-                  disabled={filteredServices.length === 0}
-                  className="px-4 py-2 rounded-xl bg-[#1e1e1c] text-[#ecc880] hover:bg-[#2c2b28] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Exportar CSV
-                </button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={filteredServices.length === 0}
+                    className="px-4 py-2 rounded-xl bg-[#1e1e1c] text-[#ecc880] hover:bg-[#2c2b28] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Exportar CSV
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={filteredServices.length === 0}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white hover:opacity-95 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Exportar Excel
+                  </button>
+                </div>
               </div>
 
               <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#fce3ed]">
@@ -2036,7 +2066,7 @@ export default function App() {
                             <AlertCircle className="w-8 h-8 text-[#ec71a8]/40" />
                             <span className="font-bold text-[#1e1e1c]">No se encontraron servicios en el filtro seleccionado.</span>
                             <button
-                              onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); }}
+                              onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); setQuickRange('all'); }}
                               className="mt-2 text-xs text-[#ec71a8] font-extrabold hover:underline cursor-pointer"
                             >
                               Restablecer todos los filtros
@@ -2530,7 +2560,7 @@ export default function App() {
                 <select
                   value={editSalonId}
                   onChange={(e) => handleEditSalonChange(e.target.value)}
-                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                  className="select-brand p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                   required
                 >
                   <option value="" disabled>Selecciona un salón...</option>
