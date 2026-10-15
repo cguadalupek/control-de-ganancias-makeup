@@ -855,7 +855,7 @@ export default function App() {
       )}
 
       {/* ================= PANEL LATERAL (SIDEBAR) ================= */}
-      <aside className="w-full md:w-80 bg-white/95 backdrop-blur-md border-r border-[#ec71a8]/20 p-6 flex flex-col justify-between shrink-0 shadow-sm z-20">
+      <aside className="hidden md:flex md:w-80 bg-white/95 backdrop-blur-md border-r border-[#ec71a8]/20 p-6 flex-col justify-between shrink-0 shadow-sm z-20">
         <div>
           {/* CABECERA CON LOGO PRINCIPAL */}
           <div className="flex items-center justify-between md:justify-start pb-6 border-b border-[#fce3ed]">
@@ -984,8 +984,19 @@ export default function App() {
         </div>
       </aside>
 
+      {/* ================= CABECERA MÓVIL ================= */}
+      <div className="md:hidden sticky top-0 z-30 bg-[#faf5f8]/95 backdrop-blur-md border-b border-[#ec71a8]/20 px-4 py-3 flex items-center justify-between">
+        <BrandLogo compact />
+        <span className="text-xs font-extrabold uppercase tracking-widest text-[#ec71a8]">
+          {activeTab === 'resumen' && 'Resumen'}
+          {activeTab === 'nuevo_servicio' && 'Registrar Servicio'}
+          {activeTab === 'productos' && 'Mis Productos'}
+          {activeTab === 'informes' && 'Informes'}
+        </span>
+      </div>
+
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto flex flex-col gap-8 overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-8 overflow-y-auto">
 
         {/* HEADER DE BIENVENIDA Y CONTROL DE MES */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-3xl p-6 sm:p-7 shadow-sm">
@@ -1339,7 +1350,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-[#fce3ed]">
+              <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#fce3ed]">
                 <table className="w-full text-left border-collapse min-w-[650px]">
                   <thead>
                     <tr className="bg-[#1e1e1c] text-white text-[11px] font-black uppercase tracking-wider">
@@ -1427,6 +1438,52 @@ export default function App() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* TARJETAS MÓVIL: ÚLTIMO SERVICIO */}
+              <div className="md:hidden flex flex-col gap-3">
+                {monthlyServices.length > 0 ? (
+                  monthlyServices.slice(0, 1).map((item) => (
+                    <div key={item.id} className="rounded-2xl bg-white border border-[#fce3ed] p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs font-bold text-[#6b6764]">{item.date} · {item.week}</span>
+                        <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
+                          {salonNombre(item.salon_id)}
+                        </span>
+                      </div>
+                      <div className="font-extrabold text-[#1e1e1c] mb-3">{item.service}</div>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-[#8c8884] font-medium">Cobrado</span>
+                        <span className="font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-[#8c8884] font-medium">Comisión</span>
+                        <span className="font-black text-[#ec71a8]">{item.commission}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[#8c8884] font-medium">Mi Ganancia</span>
+                        <span className="font-black text-[#ec71a8] text-base">S/ {item.myGain.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-[#fce3ed]">
+                        <span className="text-[#8c8884] font-medium">Ganancia Salón</span>
+                        <span className="font-semibold text-[#6b6764]">S/ {item.salongain.toFixed(2)}</span>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-[#fce3ed]">
+                        <button onClick={() => handleOpenEdit(item)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#fdebdd] text-[#b8860b] border border-[#edd5b6] font-bold text-xs">
+                          <Pencil className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => handleDeleteService(item.id)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 font-bold text-xs">
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white border border-[#fce3ed] p-6 text-center">
+                    <Sparkles className="w-8 h-8 text-[#ec71a8]/40 mx-auto mb-2" />
+                    <span className="font-extrabold text-[#1e1e1c] text-sm">No hay servicios registrados en {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}.</span>
+                  </div>
+                )}
               </div>
 
               {/* ENLACE AL HISTORIAL COMPLETO SI HAY MÁS DE UN SERVICIO */}
@@ -1898,7 +1955,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-[#fce3ed]">
+              <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#fce3ed]">
                 <table className="w-full text-left border-collapse min-w-[750px]">
                   <thead>
                     <tr className="bg-[#1e1e1c] text-white text-xs font-black uppercase tracking-wider">
@@ -1990,6 +2047,55 @@ export default function App() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* TARJETAS MÓVIL: HISTORIAL */}
+              <div className="md:hidden flex flex-col gap-3">
+                {paginatedServices.length > 0 ? (
+                  paginatedServices.map((item) => (
+                    <div key={item.id} className="rounded-2xl bg-white border border-[#fce3ed] p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs font-bold text-[#6b6764]">{item.date} · {item.week}</span>
+                        <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
+                          {salonNombre(item.salon_id)}
+                        </span>
+                      </div>
+                      <div className="font-extrabold text-[#1e1e1c] mb-3">{item.service}</div>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-[#8c8884] font-medium">Cobrado</span>
+                        <span className="font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-[#8c8884] font-medium">Comisión</span>
+                        <span className="font-black text-[#ec71a8]">{item.commission}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[#8c8884] font-medium">Mi Ganancia</span>
+                        <span className="font-black text-[#ec71a8] text-base">S/ {item.myGain.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-[#fce3ed]">
+                        <span className="text-[#8c8884] font-medium">Ganancia Salón</span>
+                        <span className="font-semibold text-[#6b6764]">S/ {item.salongain.toFixed(2)}</span>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-[#fce3ed]">
+                        <button onClick={() => handleOpenEdit(item)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#fdebdd] text-[#b8860b] border border-[#edd5b6] font-bold text-xs">
+                          <Pencil className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => handleDeleteService(item.id)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 font-bold text-xs">
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white border border-[#fce3ed] p-6 text-center">
+                    <AlertCircle className="w-8 h-8 text-[#ec71a8]/40 mx-auto mb-2" />
+                    <span className="font-bold text-[#1e1e1c] text-sm">No se encontraron servicios en el filtro seleccionado.</span>
+                    <button onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); }} className="mt-2 text-xs text-[#ec71a8] font-extrabold">
+                      Restablecer todos los filtros
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* CONTROLES DE PAGINACIÓN EN LA PARTE INFERIOR */}
@@ -2348,6 +2454,42 @@ export default function App() {
         )}
 
 </main>
+
+      {/* ================= NAVEGACIÓN INFERIOR MÓVIL ================= */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)]">
+        <div className="grid grid-cols-4 items-end">
+          <button
+            onClick={() => setActiveTab('resumen')}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            <span className="text-[10px] font-bold">Resumen</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('nuevo_servicio')}
+            className="flex flex-col items-center justify-center gap-1 py-2.5"
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/30">
+              <Plus className="w-5 h-5" />
+            </div>
+            <span className={`text-[10px] font-bold ${activeTab === 'nuevo_servicio' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}>Registrar</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('productos')}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+          >
+            <Package className="w-5 h-5" />
+            <span className="text-[10px] font-bold">Productos</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('informes')}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-[10px] font-bold">Informes</span>
+          </button>
+        </div>
+      </nav>
 
       {/* ================= MODAL INTERACTIVO DE EDICIÓN DE SERVICIO ================= */}
       {editingService && (
