@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Calendar as CalendarIcon, 
   CalendarRange,
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown, 
   Plus, 
   Trash2, 
   Pencil,
@@ -88,6 +89,83 @@ function BrandLogo({ compact = false }) {
 
 
 
+    </div>
+  );
+}
+
+// Dropdown personalizado de salón: estilo unificado del botón a la lista desplegada
+function SalonSelect({ value, onChange, salones, placeholder = 'Selecciona un salón...', allowAll = false }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const options = allowAll
+    ? [{ id: 'todos', nombre: 'Todos', desc: 'Todos los salones / estudios' }, ...salones]
+    : salones;
+  const selected = options.find((o) => String(o.id) === String(value));
+
+  const descSalon = (s) => {
+    if (!s || !s.nombre) return '';
+    return /maison/i.test(s.nombre) ? 'Solo Maquillaje · 60%' : 'Maquillaje 40% · otros 30%';
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between gap-2 p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
+          open
+            ? 'border-[#ec71a8] ring-3 ring-[#ec71a8]/15 bg-white'
+            : 'border-[#f9cee3] bg-[#faf5f8] hover:border-[#ec71a8]/50'
+        }`}
+      >
+        <span className={`flex items-center gap-2 ${selected ? 'text-[#1e1e1c]' : 'text-[#8c8884]'}`}>
+          <Store className="w-4 h-4 text-[#ec71a8] shrink-0" />
+          {selected ? selected.nombre : placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-[#ec71a8] transition-transform duration-200 shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-2 w-full rounded-2xl bg-white border border-[#f9cee3] shadow-xl shadow-[#ec71a8]/10 overflow-hidden animate-modal">
+          {options.map((o) => {
+            const active = String(o.id) === String(value);
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => { onChange(String(o.id)); setOpen(false); }}
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors cursor-pointer border-b border-[#fce3ed] last:border-b-0 ${
+                  active ? 'bg-[#fce3ed]' : 'bg-white hover:bg-[#fff5f8]'
+                }`}
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-[#ec71a8] text-white' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                    <Store className="w-4 h-4" />
+                  </span>
+                  <span className="flex flex-col min-w-0">
+                    <span className={`text-sm font-bold ${active ? 'text-[#ec71a8]' : 'text-[#1e1e1c]'}`}>{o.nombre}</span>
+                    {o.desc ? (
+                      <span className="text-[10px] font-semibold text-[#8c8884]">{o.desc}</span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-[#8c8884]">{descSalon(o)}</span>
+                    )}
+                  </span>
+                </span>
+                {active && <Check className="w-4 h-4 text-[#ec71a8] shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1580,17 +1658,11 @@ export default function App() {
                       <Store className="w-4 h-4 text-[#ec71a8]" />
                       Salón / Estudio
                     </label>
-                    <select
+                    <SalonSelect
                       value={regSalonId}
-                      onChange={(e) => handleRegSalonChange(e.target.value)}
-                      className="select-brand p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
-                      required
-                    >
-                      <option value="" disabled>Selecciona un salón...</option>
-                      {salones.map((s) => (
-                        <option key={s.id} value={s.id}>{s.nombre}</option>
-                      ))}
-                    </select>
+                      onChange={(v) => handleRegSalonChange(v)}
+                      salones={salones}
+                    />
                   </div>
 
                   {/* 1. FECHA */}
@@ -1775,16 +1847,15 @@ export default function App() {
                   <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
                   Salón:
                 </span>
-                <select
-                  value={filterSalon}
-                  onChange={(e) => setFilterSalon(e.target.value)}
-                  className="select-brand px-4 py-2.5 rounded-2xl border border-[#f9cee3] bg-white text-sm font-bold text-[#1e1e1c] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 cursor-pointer"
-                >
-                  <option value="todos">Todos</option>
-                  {salones.map((s) => (
-                    <option key={s.id} value={String(s.id)}>{s.nombre}</option>
-                  ))}
-                </select>
+                <div className="w-60">
+                  <SalonSelect
+                    value={filterSalon}
+                    onChange={(v) => setFilterSalon(v)}
+                    salones={salones}
+                    allowAll
+                    placeholder="Todos"
+                  />
+                </div>
               </div>
 
               {/* INPUTS DE FILTRO */}
@@ -2557,17 +2628,11 @@ export default function App() {
                   <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
                   Salón / Estudio
                 </label>
-                <select
+                <SalonSelect
                   value={editSalonId}
-                  onChange={(e) => handleEditSalonChange(e.target.value)}
-                  className="select-brand p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                  required
-                >
-                  <option value="" disabled>Selecciona un salón...</option>
-                  {salones.map((s) => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
-                  ))}
-                </select>
+                  onChange={(v) => handleEditSalonChange(v)}
+                  salones={salones}
+                />
               </div>
 
               {/* FECHA */}
