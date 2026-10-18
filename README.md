@@ -1,4 +1,4 @@
-# 🌸 GUADALUPE MAKE UP - Control de Ganancias y Servicios
+# 🌸 Rodríguez Make Up - Control de Ganancias y Servicios
 
 Sistema web integral y profesional diseñado para la gestión financiera, control de servicios de belleza y maquillaje, cálculo automatizado de comisiones y seguimiento de metas mensuales.
 
@@ -6,11 +6,14 @@ Sistema web integral y profesional diseñado para la gestión financiera, contro
 
 ## 📌 Descripción
 
-**GUADALUPE MAKE UP - Control de Ganancias** es una aplicación diseñada para optimizar y transparentar el registro diario de servicios prestados en el salón o estudio. Permite desglosar de forma instantánea los ingresos entre **Ganancia Personal** y **Ganancia del Salón**, proyectar el cumplimiento de metas mensuales y analizar el rendimiento histórico a través de reportes con filtros avanzados y paginación.
+**Rodríguez Make Up - Control de Ganancias** permite registrar servicios, ingresos e inventario; calcular comisiones y consultar informes históricos desde cualquier dispositivo.
 
 ---
 
 ## ✨ Características Principales
+
+- ✨ **Marca y PWA Rodríguez:** monograma “R”, favicon e iconos propios, manifiesto, service worker y aviso de instalación cuando el navegador admite instalar la aplicación.
+- 📱 **UI/UX refinada:** registro de servicio de un solo paso con etiquetas alineadas, modales centrados con scroll interno y cierre fijo, y acciones de inventario móvil de ancho completo en una paleta clara integrada con la app.
 
 - 📊 **Dashboard Dinámico Mensual:**
   - Métricas clave en tiempo real: Mi Ganancia Neta, Ganancia del Salón, Total Facturado y Progreso de la Meta.
@@ -28,12 +31,12 @@ Sistema web integral y profesional diseñado para la gestión financiera, contro
 
 - 📑 **Informes, Historial y Paginación:**
   - Filtros rápidos por período (Hoy, Esta Semana, Este Mes, Mes Anterior, Todo el Histórico).
-  - Selector interactivo mediante **Calendario Visual** con indicadores de días con servicios.
+  - Selector de período, salón y búsqueda por servicio, con contador de servicios junto al filtro principal.
   - Buscador predictivo por nombre de servicio.
-  - **Paginación inteligente:** Listado optimizado a 5 registros por página con controles de navegación previa/siguiente y acceso directo por número de página.
+  - **Paginación inteligente:** Listado optimizado a 5 registros por página, con Inicio, Último y páginas intermedias reducidas.
 
 - 🎨 **Diseño Elegante y 100% Responsivo:**
-  - Identidad visual exclusiva con paleta de colores de lujo (`#EC71A8`, `#F9CEE3`, `#FDEBD1`, `#1E1E1C` y degradados de oro satinado).
+  - Identidad visual Rodríguez con berry, mauve, crema y champagne (`#B64A83`, `#EFD3E4`, `#F6E9DF`, `#C89B6B`).
   - Adaptabilidad fluida para teléfonos móviles, tablets y computadoras de escritorio.
 
 ---

@@ -38,7 +38,8 @@ import {
   Tag,
   ShoppingBag,
   Edit3,
-  Save
+  Save,
+  Download
 } from 'lucide-react';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
@@ -61,23 +62,17 @@ const addMonthsYMD = (ymd, months) => {
   return `${target.getFullYear()}-${pad2(target.getMonth() + 1)}-${pad2(Math.min(d, lastDay))}`;
 };
 
-// Componente de Logo elegante GUADALUPE MAKE UP Rodriguez
+// Monograma de Rodríguez: una R limpia y reconocible incluso en tamaños pequeños.
 function BrandLogo({ compact = false }) {
   return (
     <div className="flex items-center gap-3 select-none">
-      {/* Emblema con monograma y pincel dorado/rosa */}
-      <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#1e1e1c] via-[#2c2b28] to-[#1e1e1c] p-0.5 shadow-md flex items-center justify-center shrink-0 border border-[#ecc880]/40 group">
-        <div className="w-full h-full rounded-[14px] bg-[#1e1e1c] flex items-center justify-center relative overflow-hidden">
-          {/* Brillo sutil de fondo */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#ec71a8]/20 via-transparent to-[#ecc880]/30 opacity-70"></div>
-          
-          {/* Vector SVG monograma GR estilizado con pincel y corazón */}
-          <svg className="w-8 h-8 text-[#ecc880] relative z-10 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M42 28 C28 28, 22 40, 22 52 C22 66, 32 76, 48 76 C60 76, 68 70, 72 62 L64 58 C60 64, 55 68, 48 68 C37 68, 30 60, 30 52 C30 44, 35 36, 43 36 C52 36, 56 42, 57 48 L65 48 C64 36, 56 28, 42 28 Z" fill="#ecc880" />
-            <path d="M50 48 H72 C77 48, 80 52, 80 56 C80 61, 76 64, 71 64 L65 64 L74 76 H64 L56 64 H56" stroke="#d4af37" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            {/* Corazón / Detalle de brillo Make Up */}
-            <path d="M74 34 C72 30, 68 30, 66 33 C64 30, 60 30, 58 34 C58 39, 66 45, 66 45 C66 45, 74 39, 74 34 Z" fill="#ec71a8" />
-            <circle cx="78" cy="26" r="2.5" fill="#f9cee3" />
+      <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#b64a83] via-[#933a69] to-[#7d4e32] p-0.5 shadow-md flex items-center justify-center shrink-0 border border-[#eec9a3]/70 group">
+        <div className="w-full h-full rounded-[14px] bg-[#fff9fc] flex items-center justify-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#efd3e4] via-white to-[#f6e9df] opacity-90"></div>
+          <svg className="w-8 h-8 relative z-10 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M27 80V20H52C69 20 78 29 78 42C78 51 73 57 64 60L80 80H64L50 63H41V80H27ZM41 51H51C59 51 64 48 64 42C64 36 59 32 51 32H41V51Z" fill="#933a69" />
+            <path d="M58 20C71 20 79 28 79 40" stroke="#c89b6b" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="79" cy="20" r="3" fill="#c89b6b" />
           </svg>
         </div>
       </div>
@@ -86,7 +81,7 @@ function BrandLogo({ compact = false }) {
         <div className="flex flex-col">
           <div className="flex items-baseline gap-1.5">
             <span className="font-extrabold text-lg sm:text-xl tracking-[0.18em] text-[#1e1e1c] uppercase leading-none">
-              Guadalupe
+              Rodríguez
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
@@ -94,7 +89,7 @@ function BrandLogo({ compact = false }) {
               MAKE UP
             </span>
             <span className="font-brand-script text-[#ec71a8] text-base sm:text-lg leading-none transform -rotate-3">
-              Rodriguez
+              Estudio
             </span>
           </div>
         </div>
@@ -360,6 +355,7 @@ export default function App() {
   const [productLoading, setProductLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false); // modal superpuesto de registro de producto
+  const [showProductsListModal, setShowProductsListModal] = useState(false);
 
   // Formulario de nuevo producto
   const todayYMDProduct = todayYMD; // reutilizamos el todayYMD ya definido arriba
@@ -381,6 +377,8 @@ export default function App() {
 
   // Toast de notificación
   const [toastMsg, setToastMsg] = useState(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const showToast = (text, type = 'success') => {
     setToastMsg({ text, type });
     setTimeout(() => setToastMsg(null), 4000);
@@ -432,6 +430,34 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('salon_services', JSON.stringify(services));
   }, [services]);
+
+  // PWA: el navegador entrega este evento solo cuando la instalación está disponible.
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+      setShowInstallBanner(true);
+    };
+    const onInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setShowInstallBanner(false);
+      localStorage.setItem('rodriguez_pwa_installed', 'true');
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const installApp = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setShowInstallBanner(false);
+  };
 
   // Auxiliar semana
   const getWeekOfMonth = (dateString) => {
@@ -934,12 +960,13 @@ export default function App() {
     setMobileMenuOpen(false);
   };
   const closeProducto = () => setShowProductModal(false);
+  const openProductsList = () => setShowProductsListModal(true);
 
   // FABs arrastrables (se recuerda dónde los deja la usuaria)
   const serviceFab = useDraggableFab({ storageKey: 'salon_fab_servicio', onTap: () => setShowRegistroModal(true) });
   const productFab = useDraggableFab({ storageKey: 'salon_fab_producto', onTap: () => setShowProductModal(true) });
 
-  const anyModalOpen = showRegistroModal || showProductModal;
+  const anyModalOpen = showRegistroModal || showProductModal || showProductsListModal;
 
   // Con una ventana modal abierta el fondo no se desplaza: el scroll ocurre solo dentro del modal.
   // Se bloquean html y body (en algunos navegadores el overflow de body no propaga al viewport).
@@ -959,7 +986,7 @@ export default function App() {
   useEffect(() => {
     if (!anyModalOpen) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape') { setShowRegistroModal(false); setShowProductModal(false); }
+      if (e.key === 'Escape') { setShowRegistroModal(false); setShowProductModal(false); setShowProductsListModal(false); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1042,6 +1069,11 @@ export default function App() {
   }, [filterFrom, filterTo, searchTerm, filterSalon]);
 
   const totalReportPages = Math.max(1, Math.ceil(filteredServices.length / itemsPerPage));
+  const visibleReportPages = useMemo(() => {
+    if (totalReportPages <= 5) return Array.from({ length: totalReportPages }, (_, i) => i + 1);
+    const nearby = [reportPage - 1, reportPage, reportPage + 1].filter((page) => page > 1 && page < totalReportPages);
+    return [1, ...(nearby[0] > 2 ? ['…'] : []), ...nearby, ...(nearby.at(-1) < totalReportPages - 1 ? ['…'] : []), totalReportPages];
+  }, [reportPage, totalReportPages]);
   const paginatedServices = useMemo(() => {
     const start = (reportPage - 1) * itemsPerPage;
     return filteredServices.slice(start, start + itemsPerPage);
@@ -1209,6 +1241,20 @@ export default function App() {
         <div className="fixed top-5 right-5 z-[60] animate-modal flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-xl border border-white/60 backdrop-blur-md bg-[#1e1e1c] text-white font-bold text-xs sm:text-sm max-w-[calc(100vw-2.5rem)]">
           <Sparkles className="w-5 h-5 text-[#ecc880] animate-pulse" />
           <span>{toastMsg.text}</span>
+        </div>
+      )}
+
+      {showInstallBanner && (
+        <div className="fixed left-3 right-3 bottom-20 md:bottom-5 md:left-auto md:right-5 z-[55] md:w-[360px] rounded-2xl border border-[#eec9a3] bg-white/95 backdrop-blur-md shadow-xl shadow-[#b64a83]/15 p-3.5 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#efd3e4] text-[#933a69] flex items-center justify-center shrink-0">
+            <Download className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold text-[#2a1a25]">Instala Rodríguez Make Up</p>
+            <p className="text-[11px] text-[#6b6764]">Ábrela como una aplicación desde tu pantalla de inicio.</p>
+          </div>
+          <button type="button" onClick={installApp} className="shrink-0 rounded-xl bg-[#b64a83] hover:bg-[#933a69] text-white px-3 py-2 text-xs font-extrabold">Instalar</button>
+          <button type="button" onClick={() => setShowInstallBanner(false)} aria-label="Cerrar aviso de instalación" className="self-start text-[#8c8884] hover:text-[#2a1a25]"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -1687,7 +1733,7 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-in fade-in duration-300">
 
             {/* SECCIÓN DE FILTROS */}
-            <section className="card-luxury rounded-3xl p-4 sm:p-7 flex flex-col gap-4 sm:gap-5">
+            <section className="card-luxury relative z-30 overflow-visible rounded-3xl p-4 sm:p-7 flex flex-col gap-4 sm:gap-5">
               <div className="flex items-center gap-3 border-b border-[#fce3ed] pb-3.5">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center shrink-0">
                   <CalendarRange className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1822,14 +1868,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2.5 bg-white/80 border border-[#fce3ed] rounded-2xl px-3.5 py-3">
-                <Filter className="w-4 h-4 text-[#ec71a8] shrink-0" />
-                <p className="text-[11px] sm:text-xs font-semibold text-[#8c8884]">
-                  Aplica un rango de fechas, un salón o una búsqueda para ver tus métricas filtradas.
-                </p>
-              </div>
-            )}
+            ) : null}
 
             {/* TABLA PRINCIPAL DE HISTORIAL CON BOTÓN DE EDITAR AL COSTADO DE ELIMINAR */}
             <section className="card-luxury rounded-3xl p-4 sm:p-8">
@@ -2007,12 +2046,13 @@ export default function App() {
 
               {/* CONTROLES DE PAGINACIÓN EN LA PARTE INFERIOR */}
               {filteredServices.length > itemsPerPage && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-5 border-t border-[#fce3ed]">
+                <div className="flex flex-col items-center justify-center gap-3 mt-6 pt-5 border-t border-[#fce3ed]">
                   <div className="text-xs text-[#8c8884] font-medium">
                     Mostrando <span className="font-bold text-[#1e1e1c]">{(reportPage - 1) * itemsPerPage + 1}</span> a <span className="font-bold text-[#1e1e1c]">{Math.min(reportPage * itemsPerPage, filteredServices.length)}</span> de <span className="font-bold text-[#1e1e1c]">{filteredServices.length}</span> servicios
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-1.5 shadow-sm">
+                    <button onClick={() => setReportPage(1)} disabled={reportPage === 1} className="px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Inicio</button>
                     {/* Botón Página Anterior */}
                     <button
                       onClick={() => setReportPage((prev) => Math.max(prev - 1, 1))}
@@ -2029,18 +2069,10 @@ export default function App() {
 
                     {/* Botones Numéricos de Página */}
                     <div className="flex items-center gap-1.5">
-                      {Array.from({ length: totalReportPages }, (_, i) => i + 1).map((pageNum) => (
-                        <button
-                          key={pageNum}
-                          onClick={() => setReportPage(pageNum)}
-                          className={`w-8 h-8 rounded-xl font-black text-xs transition-all cursor-pointer ${
-                            reportPage === pageNum
-                              ? 'bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white shadow-md shadow-[#ec71a8]/25'
-                              : 'bg-white hover:bg-[#fce3ed] text-[#6b6764] border border-[#f9cee3]'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
+                      {visibleReportPages.map((pageNum, index) => pageNum === '…' ? (
+                        <span key={`ellipsis-${index}`} className="w-5 text-center text-xs font-bold text-[#8c8884]">…</span>
+                      ) : (
+                        <button key={pageNum} onClick={() => setReportPage(pageNum)} className={`w-8 h-8 rounded-xl font-black text-xs transition-all cursor-pointer ${reportPage === pageNum ? 'bg-gradient-to-tr from-[#b64a83] to-[#933a69] text-white shadow-md shadow-[#b64a83]/25' : 'bg-white hover:bg-[#f6e3f0] text-[#6b6764] border border-[#efd3e4]'}`}>{pageNum}</button>
                       ))}
                     </div>
 
@@ -2057,6 +2089,7 @@ export default function App() {
                       Siguiente
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
+                    <button onClick={() => setReportPage(totalReportPages)} disabled={reportPage === totalReportPages} className="px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Último</button>
                   </div>
                 </div>
               )}
@@ -2068,16 +2101,26 @@ export default function App() {
       
         {activeTab === 'productos' && (
           <section className="flex flex-col gap-6">
-            {/* Buscador + listado (tema negro & dorado) */}
-            <div className="rounded-3xl p-4 sm:p-8 bg-[#151513] border border-[#ecc880]/25 shadow-xl shadow-black/20">
+            <div className="md:hidden rounded-3xl bg-white border border-[#efd3e4] p-5 shadow-lg shadow-[#b64a83]/10">
+              <div className="mb-4">
+                <h3 className="text-lg font-extrabold text-[#2a1a25]">Productos</h3>
+                <p className="text-xs text-[#6b6764]">Gestiona tu inventario desde acciones simples.</p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <button type="button" onClick={openProducto} className="w-full min-h-12 rounded-2xl bg-gradient-to-r from-[#b64a83] to-[#933a69] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-[#b64a83]/25"><Plus className="w-4 h-4" strokeWidth={3} />Registrar productos</button>
+                <button type="button" onClick={openProductsList} className="w-full min-h-12 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] text-[#933a69] font-extrabold text-sm flex items-center justify-center gap-2"><Package className="w-4 h-4" />Ver mis productos <span className="rounded-full bg-[#efd3e4] px-2 py-0.5 text-[10px]">{products.length}</span></button>
+              </div>
+            </div>
+            {/* Inventario integrado a la paleta clara de la aplicación. */}
+            <div className="hidden md:block rounded-3xl p-4 sm:p-8 bg-white border border-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#ecc880]/15 border border-[#ecc880]/30 flex items-center justify-center">
-                    <ShoppingBag className="w-5 h-5 text-[#ecc880]" />
+                  <div className="w-10 h-10 rounded-xl bg-[#f6e3f0] border border-[#efd3e4] flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5 text-[#b64a83]" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-extrabold text-white">Mis Productos</h3>
-                    <p className="text-xs text-[#b9b3a6] font-medium">
+                    <h3 className="text-lg font-extrabold text-[#2a1a25]">Mis Productos</h3>
+                    <p className="text-xs text-[#6b6764] font-medium">
                       {products.length} producto{products.length === 1 ? '' : 's'} registrado{products.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -2093,14 +2136,14 @@ export default function App() {
                         setProductSearch(e.target.value);
                         fetchProducts(e.target.value, productStatusFilter);
                       }}
-                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#ecc880]/25 text-sm font-medium bg-[#1e1e1c] text-white placeholder-[#b9b3a6] outline-none focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15 w-full sm:w-56"
+                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#efd3e4] text-sm font-medium bg-[#fff9fc] text-[#2a1a25] placeholder-[#8c8884] outline-none focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15 w-full sm:w-56"
                     />
                   </div>
-                  <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#1e1e1c] border border-[#ecc880]/25">
+                  <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#fff9fc] border border-[#efd3e4]">
                     <button
                       onClick={() => setProductStatusFilter('activo')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'activo' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
+                        productStatusFilter === 'activo' ? 'bg-[#b64a83] text-white shadow-sm' : 'text-[#6b6764] hover:text-[#b64a83]'
                       }`}
                     >
                       🟢 Activos
@@ -2108,7 +2151,7 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('terminado')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'terminado' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
+                        productStatusFilter === 'terminado' ? 'bg-[#b64a83] text-white shadow-sm' : 'text-[#6b6764] hover:text-[#b64a83]'
                       }`}
                     >
                       ⚫ Terminados
@@ -2116,7 +2159,7 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('todos')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'todos' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
+                        productStatusFilter === 'todos' ? 'bg-[#b64a83] text-white shadow-sm' : 'text-[#6b6764] hover:text-[#b64a83]'
                       }`}
                     >
                       Todos
@@ -2124,10 +2167,10 @@ export default function App() {
                   </div>
                   <button
                     onClick={openProducto}
-                    className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#ecc880] to-[#c89b6b] text-[#151513] font-extrabold text-xs shadow-md shadow-black/30 hover:opacity-95 cursor-pointer whitespace-nowrap"
+                    className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#b64a83] to-[#933a69] text-white font-extrabold text-xs shadow-md shadow-[#b64a83]/25 hover:opacity-95 cursor-pointer whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
-                    Registrar Producto
+                    Registrar productos
                   </button>
                 </div>
               </div>
@@ -2136,7 +2179,7 @@ export default function App() {
                 <div className="py-12 text-center text-[#8c8884] text-sm font-medium">Cargando productos...</div>
               ) : products.length === 0 ? (
                 <div className="py-12 text-center">
-                  <Package className="w-12 h-12 text-[#ecc880]/40 mx-auto mb-3" />
+                  <Package className="w-12 h-12 text-[#b64a83]/30 mx-auto mb-3" />
                   <p className="text-sm text-[#8c8884] font-medium">
                     {productSearch ? 'No se encontraron productos con ese nombre.' : 'Aún no tienes productos registrados.'}
                   </p>
@@ -2150,16 +2193,16 @@ export default function App() {
                       ? { color: 'gray', label: 'Terminado / Agotado', days: null }
                       : getExpirationState(p.expiration_date);
                     const colorMap = {
-                      green: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-                      yellow: { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30', dot: 'bg-amber-400' },
-                      red: { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30', dot: 'bg-rose-400' },
-                      gray: { bg: 'bg-slate-500/15', text: 'text-slate-300', border: 'border-slate-500/30', dot: 'bg-slate-400' },
+                      green: { bg: 'bg-emerald-500/10', text: 'text-emerald-700', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+                      yellow: { bg: 'bg-amber-500/10', text: 'text-amber-700', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+                      red: { bg: 'bg-rose-500/10', text: 'text-rose-700', border: 'border-rose-500/30', dot: 'bg-rose-500' },
+                      gray: { bg: 'bg-slate-500/10', text: 'text-slate-600', border: 'border-slate-500/30', dot: 'bg-slate-500' },
                     };
                     const c = colorMap[state.color];
                     return (
-                      <div key={p.id} className={`relative rounded-2xl border ${c.border} bg-[#1e1e1c] p-5 transition-all hover:border-[#ecc880]/60 hover:shadow-lg hover:shadow-black/30 ${isTerminated ? 'opacity-70 grayscale-[35%]' : ''}`}>
+                      <div key={p.id} className={`relative rounded-2xl border ${c.border} bg-[#fff9fc] p-5 transition-all hover:border-[#b64a83]/45 hover:shadow-lg hover:shadow-[#b64a83]/10 ${isTerminated ? 'opacity-70 grayscale-[35%]' : ''}`}>
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <h4 className={`font-extrabold text-base leading-tight flex-1 ${isTerminated ? 'text-[#8c8884] line-through' : 'text-white'}`}>{p.name}</h4>
+                          <h4 className={`font-extrabold text-base leading-tight flex-1 ${isTerminated ? 'text-[#8c8884] line-through' : 'text-[#2a1a25]'}`}>{p.name}</h4>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${c.bg} ${c.text} text-[10px] font-extrabold uppercase tracking-wider border ${c.border}`}>
                             <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
                             {isTerminated ? 'Terminado' : ''}
@@ -2170,28 +2213,28 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="space-y-1.5 text-xs text-[#b9b3a6] font-medium">
+                        <div className="space-y-1.5 text-xs text-[#6b6764] font-medium">
                           <div className="flex items-center justify-between">
                             <span className="text-[#b9b3a6]">Cantidad:</span>
-                            <span className="font-bold text-white">{isTerminated ? 0 : p.quantity}</span>
+                            <span className="font-bold text-[#2a1a25]">{isTerminated ? 0 : p.quantity}</span>
                           </div>
                           {p.price > 0 && (
                             <div className="flex items-center justify-between">
                               <span className="text-[#b9b3a6]">Precio:</span>
-                              <span className="font-bold text-[#ecc880]">S/ {Number(p.price).toFixed(2)}</span>
+                            <span className="font-bold text-[#933a69]">S/ {Number(p.price).toFixed(2)}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
                             <span className="text-[#b9b3a6]">Compra:</span>
-                            <span className="font-bold text-white">{p.purchase_date}</span>
+                            <span className="font-bold text-[#2a1a25]">{p.purchase_date}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[#b9b3a6]">Caducidad:</span>
-                            <span className="font-bold text-white">{p.expiration_date}</span>
+                            <span className="font-bold text-[#2a1a25]">{p.expiration_date}</span>
                           </div>
                           <div className="flex items-center justify-between pt-1.5 border-t border-[#ecc880]/15">
                             <span className="text-[#b9b3a6]">Apertura:</span>
-                            <span className={`font-bold ${p.start_date ? 'text-white' : 'text-[#b9b3a6] italic'}`}>
+                            <span className={`font-bold ${p.start_date ? 'text-[#2a1a25]' : 'text-[#8c8884] italic'}`}>
                               {p.start_date || 'Sin abrir'}
                             </span>
                           </div>
@@ -2201,11 +2244,11 @@ export default function App() {
                           {isTerminated ? '⚠️ Terminado / Agotado — fuera del semáforo de vencimiento' : state.label}
                         </div>
 
-                        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-[#ecc880]/15">
+                        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-[#efd3e4]">
                           {!isTerminated && !p.start_date && (
                             <button
                               onClick={() => handleOpenToday(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#ecc880]/10 border border-[#ecc880]/40 text-[#ecc880] hover:bg-[#ecc880]/25 font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#f6e3f0] border border-[#efd3e4] text-[#933a69] hover:bg-[#efd3e4] font-bold text-xs transition-colors cursor-pointer"
                               title="Marca este producto como abierto hoy"
                             >
                               <CalendarCheck className="w-3.5 h-3.5" />
@@ -2215,7 +2258,7 @@ export default function App() {
                           {!isTerminated && (
                             <button
                               onClick={() => handleFinishProduct(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-[#ecc880]/25 text-[#ecc880] hover:border-[#ecc880] font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#efd3e4] text-[#933a69] hover:bg-[#fff9fc] font-bold text-xs transition-colors cursor-pointer"
                               title="Marcar este producto como terminado/agotado"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -2225,7 +2268,7 @@ export default function App() {
                           {isTerminated && (
                             <button
                               onClick={() => handleReactivateProduct(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/25 font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/40 text-emerald-700 hover:bg-emerald-500/20 font-bold text-xs transition-colors cursor-pointer"
                               title="Volver a activar este producto"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -2234,14 +2277,14 @@ export default function App() {
                           )}
                           <button
                             onClick={() => openEditProduct(p)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-[#ecc880]/25 text-[#ecc880] hover:border-[#ecc880] font-bold text-xs transition-colors cursor-pointer"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#efd3e4] text-[#933a69] hover:bg-[#fff9fc] font-bold text-xs transition-colors cursor-pointer"
                             title="Editar producto"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(p.id)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-rose-400/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs transition-colors cursor-pointer"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-rose-400/40 text-rose-700 hover:bg-rose-500/10 font-bold text-xs transition-colors cursor-pointer"
                             title="Eliminar producto"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -2261,32 +2304,22 @@ export default function App() {
         {/* ================= MODAL: REGISTRAR SERVICIO (overlay + backdrop blur) ================= */}
         {showRegistroModal && (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1e1e1c]/60 backdrop-blur-md sm:p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1e1e1c]/60 backdrop-blur-md p-3 sm:p-4"
             onClick={closeRegistro}
           >
             <section
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[#f9cee3] flex flex-col overflow-hidden animate-modal"
+              className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-[#f9cee3] flex flex-col overflow-hidden animate-modal"
             >
-              {/* CABECERA: cierre a la IZQUIERDA */}
+              {/* Cabecera fija; la X queda siempre en la esquina superior derecha. */}
               <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#fce3ed] px-4 py-3 sm:px-6">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <button
-                    type="button"
-                    onClick={closeRegistro}
-                    aria-label="Cerrar registro de servicio"
-                    className="p-2 rounded-xl bg-[#fce3ed] text-[#1e1e1c] hover:bg-[#f9cee3] cursor-pointer shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                   <div className="min-w-0">
                     <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] truncate">Registrar Servicio</h3>
                     <p className="text-[10px] sm:text-xs text-[#8c8884] truncate">Comisión automática según salón y servicio</p>
                   </div>
                 </div>
-                <span className="hidden sm:inline text-[10px] bg-[#fdebdd] text-[#b8860b] px-2.5 py-1 rounded-full border border-[#edd5b6] font-extrabold whitespace-nowrap">
-                  GUADALUPE MAKE UP
-                </span>
+                <button type="button" onClick={closeRegistro} aria-label="Cerrar registro de servicio" className="p-2 rounded-xl bg-[#fce3ed] text-[#1e1e1c] hover:bg-[#f9cee3] cursor-pointer shrink-0"><X className="w-4 h-4" /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
@@ -2295,7 +2328,7 @@ export default function App() {
 
                     {/* 0. SALÓN / ESTUDIO (obligatorio) */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                         <Store className="w-4 h-4 text-[#ec71a8]" />
                         Salón / Estudio
                       </label>
@@ -2308,7 +2341,7 @@ export default function App() {
 
                     {/* 1. FECHA */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                         <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
                         Fecha del Servicio
                       </label>
@@ -2323,7 +2356,7 @@ export default function App() {
 
                     {/* 2. SERVICIO REALIZADO */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-[#ec71a8]" />
                         Servicio Realizado
                       </label>
@@ -2345,7 +2378,7 @@ export default function App() {
 
                     {/* 3. PRECIO COBRADO */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                         <DollarSign className="w-4 h-4 text-[#ec71a8]" />
                         Precio Cobrado (S/)
                       </label>
@@ -2363,7 +2396,7 @@ export default function App() {
 
                     {/* 4. COMISIÓN (autocompletada, ajustable) */}
                     <div className="flex flex-col gap-2">
-                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                         <Percent className="w-4 h-4 text-[#ec71a8]" />
                         Comisión (% Mi Ganancia)
                       </label>
@@ -2386,8 +2419,8 @@ export default function App() {
 
                   </div>
 
-                  {/* SERVICIOS EXTRA: misma clienta, misma transacción */}
-                  <div className="rounded-2xl border border-dashed border-[#f9cee3] bg-[#fff9fb] p-3 sm:p-5 flex flex-col gap-3">
+                  {/* Los servicios se registran de uno en uno para mantener el formulario claro. */}
+                  {false && <div className="rounded-2xl border border-dashed border-[#f9cee3] bg-[#fff9fb] p-3 sm:p-5 flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-[#ec71a8]" />
@@ -2470,27 +2503,27 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div>}
 
                   {/* VISTA PREVIA DEL CÁLCULO EN VIVO (suma del servicio principal + extras) */}
-                  {batchLivePrice > 0 && (
+                  {livePrice > 0 && (
                     <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-3.5 sm:p-5 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-[#ec71a8]" />
                         <span className="font-extrabold text-xs sm:text-sm text-[#1e1e1c]">
-                          Cálculo en Tiempo Real{itemsCount > 1 ? ` (${itemsCount} servicios)` : ''}:
+                          Cálculo en Tiempo Real:
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
                         <div>
                           <span className="text-[#8c8884] font-medium">Total: </span>
-                          <span className="font-extrabold text-[#1e1e1c]">S/ {batchLivePrice.toFixed(2)}</span>
+                          <span className="font-extrabold text-[#1e1e1c]">S/ {livePrice.toFixed(2)}</span>
                         </div>
                         <div className="bg-[#ec71a8] text-white px-3 py-1.5 rounded-xl font-extrabold shadow-sm">
-                          Mi Ganancia: S/ {batchLiveMyGain.toFixed(2)}
+                          Mi Ganancia: S/ {liveMyGain.toFixed(2)}
                         </div>
                         <div className="bg-[#1e1e1c] text-[#ecc880] px-3 py-1.5 rounded-xl font-bold">
-                          Salón: S/ {batchLiveSalonGain.toFixed(2)}
+                          Salón: S/ {(livePrice - liveMyGain).toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -2512,51 +2545,37 @@ export default function App() {
                   >
                     <CheckCircle2 className="w-5 h-5 shrink-0" />
                     Guardar
-                    {itemsCount > 1 && (
-                      <span className="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-black">{itemsCount}</span>
-                    )}
                   </button>
                 </div>
               </form>
             </section>
           </div>
         )}
-        {/* ================= MODAL: REGISTRAR PRODUCTO (overlay, negro & dorado) ================= */}
+        {/* ================= MODAL: REGISTRAR PRODUCTO ================= */}
         {showProductModal && (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md sm:p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#2a1a25]/55 backdrop-blur-md p-3 sm:p-4"
             onClick={closeProducto}
           >
             <section
               onClick={(e) => e.stopPropagation()}
-              className="w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl bg-[#151513] border border-[#ecc880]/30 shadow-2xl flex flex-col overflow-hidden animate-modal"
+              className="w-full max-w-2xl max-h-[90vh] rounded-3xl bg-white border border-[#efd3e4] shadow-2xl flex flex-col overflow-hidden animate-modal"
             >
-              {/* CABECERA: cierre a la IZQUIERDA */}
-              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#ecc880]/20 px-4 py-3 sm:px-6">
+              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#efd3e4] px-4 py-3 sm:px-6">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <button
-                    type="button"
-                    onClick={closeProducto}
-                    aria-label="Cerrar registro de producto"
-                    className="p-2 rounded-xl bg-[#ecc880]/15 text-[#ecc880] hover:bg-[#ecc880]/25 cursor-pointer shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                   <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-extrabold text-white truncate">Registrar Producto</h3>
-                    <p className="text-[10px] sm:text-xs text-[#b9b3a6] truncate">Inventario unitario · caducidad automática</p>
+                    <h3 className="text-base sm:text-lg font-extrabold text-[#2a1a25] truncate">Registrar productos</h3>
+                    <p className="text-[10px] sm:text-xs text-[#6b6764] truncate">Inventario unitario · caducidad automática</p>
                   </div>
                 </div>
-                <span className="hidden sm:inline text-[10px] bg-[#ecc880]/15 text-[#ecc880] px-2.5 py-1 rounded-full border border-[#ecc880]/40 font-extrabold whitespace-nowrap">
-                  INVENTARIO
-                </span>
+                <button type="button" onClick={closeProducto} aria-label="Cerrar registro de producto" className="p-2 rounded-xl bg-[#f6e3f0] text-[#933a69] hover:bg-[#efd3e4] cursor-pointer shrink-0"><X className="w-4 h-4" /></button>
               </div>
 
               <form onSubmit={handleCreateProduct} className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-[#b64a83]" />
                       Nombre del producto
                     </label>
                     <input
@@ -2564,14 +2583,14 @@ export default function App() {
                       value={prodName}
                       onChange={(e) => setProdName(e.target.value)}
                       placeholder="Ej: Pestañina Maybelline"
-                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white placeholder-[#8c8884] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold outline-none bg-[#fff9fc] text-[#2a1a25] placeholder-[#8c8884] focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15"
                       required
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <Package className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-[#b64a83]" />
                       Cantidad
                     </label>
                     <input
@@ -2580,14 +2599,14 @@ export default function App() {
                       disabled
                       readOnly
                       aria-label="Cantidad fija: 1 unidad"
-                      className="w-full p-3 border border-[#ecc880]/15 rounded-2xl text-sm font-bold bg-[#ecc880]/10 text-[#b9b3a6] cursor-not-allowed outline-none"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold bg-[#f6e3f0] text-[#6b6764] cursor-not-allowed outline-none"
                     />
-                    <span className="text-[10px] font-semibold text-[#b9b3a6]">Stock unitario · 1 por producto</span>
+                    <span className="text-[10px] font-semibold text-[#8c8884]">Stock unitario · 1 por producto</span>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <DollarSign className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-[#b64a83]" />
                       Precio / Costo (S/)
                     </label>
                     <input
@@ -2597,46 +2616,45 @@ export default function App() {
                       value={prodPrice}
                       onChange={(e) => setProdPrice(e.target.value)}
                       placeholder="0.00"
-                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white placeholder-[#8c8884] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold outline-none bg-[#fff9fc] text-[#2a1a25] placeholder-[#8c8884] focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <CalendarIcon className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-[#b64a83]" />
                       Fecha de compra
                     </label>
                     <input
                       type="date"
                       value={prodPurchaseDate}
                       onChange={(e) => handlePurchaseDateChange(e.target.value)}
-                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold outline-none bg-[#fff9fc] text-[#2a1a25] focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15"
                       required
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <CalendarCheck className="w-3.5 h-3.5 text-[#ecc880]" />
-                      Fecha de apertura <span className="text-[#b9b3a6] normal-case font-medium">(opcional)</span>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <CalendarCheck className="w-3.5 h-3.5 text-[#b64a83]" />
+                      Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
                     </label>
                     <input
                       type="date"
                       value={prodStartDate}
                       onChange={(e) => setProdStartDate(e.target.value)}
-                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold outline-none bg-[#fff9fc] text-[#2a1a25] focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#b64a83]" />
                       Caducidad
                     </label>
                     <BrandSelect
                       value={prodExpiryPreset}
                       onChange={handleExpiryPresetChange}
-                      dark
                       options={[
                         { value: '6', label: '6 meses', desc: 'Caducidad automática' },
                         { value: '12', label: '12 meses', desc: 'Caducidad automática' },
@@ -2648,38 +2666,57 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#ecc880]" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#933a69] flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#b64a83]" />
                       Fecha de caducidad
                     </label>
                     <input
                       type="date"
                       value={prodExpirationDate}
                       onChange={(e) => { setProdExpirationDate(e.target.value); setProdExpiryPreset(''); }}
-                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      className="w-full p-3 border border-[#efd3e4] rounded-2xl text-sm font-bold outline-none bg-[#fff9fc] text-[#2a1a25] focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15"
                       required
                     />
-                    <span className="text-[10px] font-semibold text-[#b9b3a6]">Se calcula sola con 6 o 12 meses</span>
+                    <span className="text-[10px] font-semibold text-[#8c8884]">Se calcula sola con 6 o 12 meses</span>
                   </div>
                 </div>
 
-                <div className="shrink-0 border-t border-[#ecc880]/20 bg-[#151513] px-4 sm:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-end gap-2.5">
+                <div className="shrink-0 border-t border-[#efd3e4] bg-white px-4 sm:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={closeProducto}
-                    className="px-5 py-3 rounded-2xl border border-[#8c8884]/40 bg-[#1e1e1c] hover:border-[#ecc880]/60 text-[#b9b3a6] hover:text-[#ecc880] font-bold text-sm cursor-pointer whitespace-nowrap"
+                    className="px-5 py-3 rounded-2xl border border-[#efd3e4] bg-white hover:bg-[#fff9fc] text-[#6b6764] font-bold text-sm cursor-pointer whitespace-nowrap"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ecc880] to-[#c89b6b] text-[#151513] font-extrabold text-sm shadow-lg shadow-black/40 hover:opacity-95 cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#b64a83] to-[#933a69] text-white font-extrabold text-sm shadow-lg shadow-[#b64a83]/25 hover:opacity-95 cursor-pointer flex items-center gap-2 whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
                     Registrar
                   </button>
                 </div>
               </form>
+            </section>
+          </div>
+        )}
+
+        {showProductsListModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2a1a25]/55 backdrop-blur-md p-3 sm:p-4" onClick={() => setShowProductsListModal(false)}>
+            <section onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[90vh] rounded-3xl bg-white border border-[#efd3e4] shadow-2xl flex flex-col overflow-hidden animate-modal">
+              <div className="shrink-0 flex items-center justify-between border-b border-[#efd3e4] px-5 py-4">
+                <div><h3 className="font-extrabold text-[#2a1a25]">Mis productos</h3><p className="text-xs text-[#6b6764]">{products.length} registrados</p></div>
+                <button type="button" onClick={() => setShowProductsListModal(false)} aria-label="Cerrar mis productos" className="p-2 rounded-xl bg-[#f6e3f0] text-[#933a69]"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3">
+                {products.length === 0 ? <p className="py-10 text-center text-sm text-[#8c8884]">Aún no tienes productos registrados.</p> : products.map((p) => (
+                  <article key={p.id} className="rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-4">
+                    <div className="flex items-start justify-between gap-3"><h4 className="font-extrabold text-[#2a1a25]">{p.name}</h4><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${p.status === 'terminado' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>{p.status === 'terminado' ? 'Terminado' : 'Activo'}</span></div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6b6764]"><span>Cantidad: <b>{p.status === 'terminado' ? 0 : p.quantity}</b></span><span>Caduca: <b>{p.expiration_date}</b></span></div>
+                  </article>
+                ))}
+              </div>
             </section>
           </div>
         )}
@@ -2723,9 +2760,9 @@ export default function App() {
           style={serviceFab.style}
           aria-label="Registrar nuevo servicio"
           title="Registrar servicio · mantén pulsado para mover"
-          className="md:hidden fixed z-40 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white select-none cursor-grab active:cursor-grabbing"
+          className="md:hidden fixed z-40 h-12 px-4 rounded-full bg-gradient-to-r from-[#b64a83] to-[#933a69] text-white flex items-center justify-center gap-1.5 shadow-lg shadow-[#b64a83]/35 ring-4 ring-white select-none cursor-grab active:cursor-grabbing text-sm font-extrabold"
         >
-          <Plus className="w-6 h-6" strokeWidth={3} />
+          <Plus className="w-4 h-4" strokeWidth={3} /> Registrar
         </button>
       )}
 
@@ -2737,9 +2774,9 @@ export default function App() {
           style={productFab.style}
           aria-label="Registrar producto"
           title="Registrar producto · mantén pulsado para mover"
-          className="md:hidden fixed z-40 w-14 h-14 rounded-full bg-gradient-to-br from-[#2c2b28] to-[#151513] text-[#ecc880] border border-[#ecc880]/60 flex items-center justify-center shadow-lg shadow-black/40 ring-2 ring-[#ecc880]/40 select-none cursor-grab active:cursor-grabbing"
+          className="md:hidden fixed z-40 h-12 px-4 rounded-full bg-gradient-to-r from-[#b64a83] to-[#933a69] text-white border border-[#efd3e4] flex items-center justify-center gap-1.5 shadow-lg shadow-[#b64a83]/30 ring-2 ring-[#efd3e4] select-none cursor-grab active:cursor-grabbing text-sm font-extrabold"
         >
-          <Plus className="w-6 h-6" strokeWidth={3} />
+          <Plus className="w-4 h-4" strokeWidth={3} /> Registrar
         </button>
       )}
 
