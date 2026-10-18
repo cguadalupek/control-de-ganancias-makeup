@@ -101,6 +101,37 @@ function BrandLogo({ compact = false }) {
   );
 }
 
+// Contador animado: los montos del Resumen suben de 0 al valor real al entrar
+// (rápido, con frenada suave; se salta la animación con prefers-reduced-motion).
+function AnimatedAmount({ value = 0, className = '', duration = 850 }) {
+  const target = Number(value) || 0;
+  const [shown, setShown] = useState(0);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+    if (reduce || duration <= 0) {
+      setShown(target);
+      return undefined;
+    }
+    setShown(0);
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(target * eased);
+      if (p < 1) frameRef.current = requestAnimationFrame(tick);
+      else setShown(target);
+    };
+    frameRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, duration]);
+
+  return <span className={className}>S/ {shown.toFixed(2)}</span>;
+}
+
 // Dropdown de marca reutilizable: mismo estilo del selector de Salón
 // (botón con chevron + panel animado). Se usa en Salón, Rango de fechas y Caducidad.
 function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona...', icon: Icon = Store, buttonClass = '', panelClass = '', trailing = null, dark = false }) {
@@ -122,7 +153,7 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between gap-2 p-3 sm:p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
+        className={`w-full flex items-center justify-between gap-2 field-uniform p-3 sm:p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
           open
             ? (dark ? 'border-[#ecc880] ring-3 ring-[#ecc880]/20 bg-[#1e1e1c]' : 'border-[#ec71a8] ring-3 ring-[#ec71a8]/15 bg-white')
             : (dark ? 'border-[#ecc880]/30 bg-[#1e1e1c] hover:border-[#ecc880]/70' : 'border-[#f9cee3] bg-[#faf5f8] hover:border-[#ec71a8]/50')
@@ -183,7 +214,7 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
 function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAll = false }) {
   const descSalon = (s) => {
     if (!s || !s.nombre) return '';
-    if (s.propio || /rodriguez/i.test(s.nombre)) return 'Mi entidad propia · 100% para mí';
+    if (s.propio || /rodriguez/i.test(s.nombre)) return 'Mi entidad propia - 100%';
     return /maison/i.test(s.nombre) ? 'Solo Maquillaje · 60%' : 'Maquillaje 40% · otros 30%';
   };
 
@@ -272,7 +303,7 @@ function BrandDateField({ ariaLabel = 'Elegir fecha', align = 'left', value, onC
         onClick={() => (open ? setOpen(false) : openCalendar())}
         aria-label={ariaLabel}
         aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
+        className={`w-full flex items-center justify-between gap-2 field-uniform p-2.5 sm:p-3 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
           open
             ? 'border-[#d94691] bg-white ring-2 ring-[#d94691]/20 shadow-[0_0_18px_rgba(217,70,145,0.22)]'
             : 'border-[#e8a1c6] bg-gradient-to-br from-[#fff6fb] to-white shadow-[0_0_14px_rgba(217,70,145,0.10)] hover:border-[#d94691]/70'
@@ -1521,7 +1552,7 @@ export default function App() {
                 </div>
                 <div className="mt-3 sm:mt-5">
                   <div className="text-3xl sm:text-5xl font-black text-[#1e1e1c] tracking-tight whitespace-nowrap">
-                    S/ {monthMyGain.toFixed(2)}
+                    <AnimatedAmount value={monthMyGain} />
                   </div>
                   <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ec71a8] shrink-0"></span>
@@ -1542,7 +1573,7 @@ export default function App() {
                 </div>
                 <div className="mt-3 sm:mt-5">
                   <div className="text-xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight whitespace-nowrap">
-                    S/ {monthFacturado.toFixed(2)}
+                    <AnimatedAmount value={monthFacturado} />
                   </div>
                   <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764]">
                     {monthlyServices.length} {monthlyServices.length === 1 ? 'servicio en el mes' : 'servicios en el mes'}
@@ -1564,7 +1595,7 @@ export default function App() {
                 <div className="mt-3 sm:mt-5">
                   <div className="text-sm sm:text-3xl font-black text-[#1e1e1c] leading-tight break-words">
                     {monthRemainingGoal > 0 ? (
-                      <span>Faltan S/ {monthRemainingGoal.toFixed(2)}</span>
+                      <span>Faltan <AnimatedAmount value={monthRemainingGoal} /></span>
                     ) : (
                       <span className="text-[#ec71a8] flex flex-wrap items-center gap-1">
                         ¡Meta Cumplida! <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#ecc880] shrink-0" />
@@ -1656,7 +1687,7 @@ export default function App() {
                   className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#f3b4d4] bg-gradient-to-br from-[#fff6fb] to-[#efd3e4] shadow-lg shadow-[#b64a83]/10 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#933a69]">Ganancia Neta</span><Store className="w-5 h-5 text-[#b64a83]" /></div>
-                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Salón Vanidades</p><p className="text-3xl font-black text-[#2a1a25]">S/ {vanidadesNetGain.toFixed(2)}</p>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Salón Vanidades</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={vanidadesNetGain} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#933a69]">Ver en Informes →</p>
                 </button>
                 <button
@@ -1666,7 +1697,7 @@ export default function App() {
                   className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#eec9a3] bg-gradient-to-br from-[#fffaf4] to-[#f6e9df] shadow-lg shadow-[#c89b6b]/15 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#7d4e32]">Ganancia Neta</span><Store className="w-5 h-5 text-[#c89b6b]" /></div>
-                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Maison Studio</p><p className="text-3xl font-black text-[#2a1a25]">S/ {maisonNetGain.toFixed(2)}</p>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Maison Studio</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={maisonNetGain} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#7d4e32]">Ver en Informes →</p>
                 </button>
                 {/* Mis ganancias independientes (entidad propia Rodriguez Makeup, 100%) */}
@@ -1677,8 +1708,8 @@ export default function App() {
                   className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#ec71a8]/45 bg-gradient-to-br from-[#fff6fb] via-[#fdf2f7] to-[#fdebdd] shadow-lg shadow-[#ec71a8]/20 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#b64a83]">Ganancia Neta · Propia</span><Sparkles className="w-5 h-5 text-[#ec71a8]" /></div>
-                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">{independienteNombre} · 100% mío, sin comisión</p>
-                  <p className="text-3xl font-black text-[#2a1a25]">S/ {independienteNetGain.toFixed(2)}</p>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">{independienteNombre} · Mi entidad propia - 100%</p>
+                  <p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={independienteNetGain} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#b64a83]">
                     {independienteServicios.length} {independienteServicios.length === 1 ? 'servicio propio' : 'servicios propios'} · Ver en Informes →
                   </p>
@@ -1863,7 +1894,7 @@ export default function App() {
                         placeholder="Nombre del servicio"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-11 pr-10 py-3 sm:pl-12 sm:pr-11 sm:py-3.5 border border-[#f9cee3] rounded-xl text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                        className="w-full field-uniform pl-11 pr-10 sm:pl-12 sm:pr-11 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                       />
                       {searchTerm && (
                         <button
@@ -2162,7 +2193,7 @@ export default function App() {
               </div>
             </div>
             {/* Inventario integrado a la paleta clara de la aplicación. */}
-            <div className="block rounded-3xl p-4 sm:p-8 bg-white border border-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
+            <div className="hidden md:block rounded-3xl p-4 sm:p-8 bg-white border border-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[#f6e3f0] border border-[#efd3e4] flex items-center justify-center">
@@ -2449,12 +2480,12 @@ export default function App() {
                         <CalendarIcon className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Fecha del Servicio
                       </label>
-                      <input
-                        type="date"
+                      <BrandDateField
+                        ariaLabel="Fecha del servicio"
+                        align="left"
+                        placeholder="Elegir fecha"
                         value={regDate}
-                        onChange={(e) => setRegDate(e.target.value)}
-                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
-                        required
+                        onChange={(v) => setRegDate(v || todayYMD)}
                       />
                     </div>
 
@@ -2470,17 +2501,12 @@ export default function App() {
                         value={regService}
                         onChange={(e) => handleRegServiceChange(e.target.value)}
                         disabled={esMaison(regSalonId)}
-                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
+                        className="field-uniform border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                         required
                       />
                       {esMaison(regSalonId) && (
                         <span className="text-[11px] font-bold text-[#ec71a8]">
                           Maison Studio solo permite Maquillaje
-                        </span>
-                      )}
-                      {esPropio(regSalonId) && (
-                        <span className="text-[11px] font-bold text-[#933a69]">
-                          Escribe libremente el servicio que hiciste por tu cuenta
                         </span>
                       )}
                     </div>
@@ -2498,7 +2524,7 @@ export default function App() {
                         placeholder="0.00"
                         value={regPrice}
                         onChange={(e) => setRegPrice(e.target.value)}
-                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        className="field-uniform border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                         required
                       />
                     </div>
@@ -2517,12 +2543,12 @@ export default function App() {
                         value={regCommission}
                         onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
                         disabled={esPropio(regSalonId)}
-                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
+                        className="field-uniform border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                         required
                       />
                       <span className={`text-[11px] font-semibold ${esPropio(regSalonId) ? 'font-bold text-[#933a69]' : 'text-[#8c8884]'}`}>
                         {esPropio(regSalonId)
-                          ? '🔒 Mi entidad propia: comisión bloqueada al 100% (todo es tuyo)'
+                          ? '🔒 Mi entidad propia - 100%'
                           : esMaison(regSalonId)
                             ? 'Auto: Maison Studio · Maquillaje 60%'
                             : 'Auto: Maquillaje 40% · otros servicios 30%'}
@@ -2949,12 +2975,12 @@ export default function App() {
                   <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
                   Fecha
                 </label>
-                <input
-                  type="date"
+                <BrandDateField
+                  ariaLabel="Fecha del servicio"
+                  align="left"
+                  placeholder="Elegir fecha"
                   value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                  required
+                  onChange={(v) => setEditDate(v || editDate)}
                 />
               </div>
 
@@ -3014,7 +3040,7 @@ export default function App() {
                     required
                   />
                   <span className={`text-[10px] font-semibold ${esPropio(editSalonId) ? 'font-bold text-[#933a69]' : 'text-[#8c8884]'}`}>
-                    {esPropio(editSalonId) ? '🔒 Entidad propia: 100% para mí (sin comisión)' : 'Comisión del servicio'}
+                    {esPropio(editSalonId) ? '🔒 Mi entidad propia - 100%' : 'Comisión del servicio'}
                   </span>
                 </div>
               </div>

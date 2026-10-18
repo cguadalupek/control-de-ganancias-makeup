@@ -209,3 +209,23 @@
   outline: 3px solid rgba(236, 113, 168, 0.55);
   outline-offset: 2px;
 }
+
+
+/* ============================================================
+   Altura única de campos: listas desplegables (BrandSelect),
+   campos de texto y campos de calendario (BrandDateField).
+   El padding vertical se anula y el contenido queda centrado,
+   así que todas las filas de un formulario miden lo mismo.
+   !important porque Tailwind emite `sm:p-3.5` después de `pl-*`.
+   ============================================================ */
+.field-uniform {
+  height: 3rem !important;          /* 48px en móvil */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+@media (min-width: 640px) {
+  .field-uniform {
+    height: 3.25rem !important;     /* 52px desde sm */
+  }
+}

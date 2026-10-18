@@ -66,20 +66,25 @@ El porcentaje se normaliza (`40` o `0.40` → 40 %). Ganancia personal = precio 
   de totales solo con `hasActiveFilters`, historial en **tabla `hidden md:block`**
   (`min-w-[750px]` dentro de `overflow-x-auto`) y en **tarjetas** en móvil (`md:hidden`),
   paginación de 5 registros con Inicio/Último.
-- **Productos:** el inventario ya se ve también en móvil (`block`), en **rejilla 3×3 en escritorio**
-  (`md:grid-cols-2 xl:grid-cols-3`) con **9 productos por página** y controles de paginación copiados de
-  Informes (`productPage`/`productsPerPage`). Cada tarjeta lleva Abrir Hoy (si no está abierto) /
-  Terminado / Reactivar / Editar / Eliminar, con etiqueta de texto también en móvil. Arriba, en móvil, una
-  tarjeta de acciones con "Registrar productos" (pulsante) y "Ver mis productos" (modal, con los mismos
-  botones en cada resultado). Tema negro & dorado en el listado.
+- **Productos:** en móvil solo la caja de acciones (Registrar productos pulsante + Ver mis productos → modal
+  con Abrir Hoy/Terminado/Reactivar/Editar/Eliminar en cada resultado). El inventario (`hidden md:block`) es
+  **solo de escritorio**: rejilla **3×3** (`md:grid-cols-2 xl:grid-cols-3`) con **9 productos por página** y
+  controles de paginación copiados de Informes (`productPage`/`productsPerPage`). Cada tarjeta lleva Abrir
+  Hoy (si no está abierto) / Terminado / Reactivar / Editar / Eliminar.
 
 ## Componentes reutilizables (`App.jsx`)
 
 - `BrandSelect` — desplegable de marca (botón + panel animado). Usado en Salón, Rango de fechas y Caducidad.
-- `SalonSelect` — `BrandSelect` con la lista de salones.
+- `SalonSelect` — `BrandSelect` con la lista de salones (la entidad propia se describe como *Mi entidad propia - 100%*).
 - `BrandDateField` — campo de fecha con **calendario propio** (cabecera degradada rosa, semana de lunes,
   hoy y día seleccionado resaltados, pie `Hoy`/`Limpiar`). Sustituye al `input[type=date]` nativo, cuyo
-  popup no se puede estilar.
+  popup no se puede estilar. **Se usa en los filtros de Informes y también en los modales de registro y
+  edición de servicio** (mismo estilo y misma altura); el alta/edición de **producto** sigue con
+  `input[type=date]` nativo.
+- `AnimatedAmount` — contador animado (`0 → valor` en ~850 ms con frenada `ease-out`) que usan **todos los
+  montos del Resumen** (Mi Ganancia Neta, Total Facturado, "Faltan S/ …" y las tres ganancias por salón).
+  Se re-anima al cambiar de mes o cuando llegan los datos del backend; con `prefers-reduced-motion` muestra
+  el valor directo.
 - `BrandLogo` — monograma + wordmark (`compact` para la barra móvil).
 
 ## Despliegue (desde Windows con plink)
@@ -142,8 +147,9 @@ cd /opt/salon-app && git add -A && git commit -m "tipo(scope): mensaje" && git p
   **`gain-card`** (hover de los botones de ganancia neta: `scale(1.035)` + brillo, solo en
   `@media (hover: hover) and (pointer: fine)`); todas con variante para `prefers-reduced-motion`.
 - **Ventana "Registrar Servicio":** en escritorio `max-w-2xl md:max-w-4xl xl:max-w-5xl`, rejilla de campos
-  `sm:grid-cols-2 lg:grid-cols-4` (Salón · Fecha · Servicio ancho / Precio ancho · Comisión ancho) con
-  labels e inputs algo más grandes.
+  `sm:grid-cols-2 lg:grid-cols-4` (Salón · Fecha · Servicio ancho / Precio ancho · Comisión ancho). Todos
+  los controles comparten **altura uniforme** (48 px en móvil, 52 px desde `sm`) gracias a
+  `.field-uniform`; el campo Fecha usa el calendario de marca, no el `input[type=date]`.
 - **Sin aviso de instalación PWA:** se eliminó el banner "Instala Rodríguez Make Up" junto con su estado
   (`deferredInstallPrompt`, `showInstallBanner`), el `beforeinstallprompt` y `installApp`. El `sw.js` sigue
   existiendo por si la app ya está instalada.
@@ -183,8 +189,12 @@ viewport y que la consola quede sin errores.
 - **Tailwind: una variante pisa la utilidad base del mismo grupo.** `sm:p-3.5` se emite después de `pl-9`,
   así que en escritorio el `padding-left` acababa en 14 px y el texto del campo "Nombre del servicio"
   chocaba con el icono de la lupa. Regla: en inputs con icono superpuesto, el padding lateral va **con la
-  misma variante** (`pl-11 pr-10 py-3 sm:pl-12 sm:pr-11 sm:py-3.5`), nunca mezclando `p-*` con `pl-*`.
-  Comprobarlo midiendo `computedStyle.paddingLeft` y el hueco real (`input.left + paddingLeft - icon.right > 8`).
+  misma variante** (`pl-11 pr-10 sm:pl-12 sm:pr-11`), nunca mezclando `p-*` con `pl-*`. Y para que **todos**
+  los controles (listas, texto, calendario) midan lo mismo se usa la clase `.field-uniform` de `index.css`
+  (fija `height` 48/52 px y anula el padding vertical con `!important`, porque las utilidades de Tailwind no
+  se pueden sobrescribir de otra forma sin tocar cada cadena de clases). Comprobar midiendo
+  `computedStyle.paddingLeft` / `getBoundingClientRect().height` y el hueco real
+  (`input.left + paddingLeft - icon.right > 8`).
 - **`frontend/src/App.jsx` usa finales de línea CRCRLF (`\r\r\n`).** Las herramientas `patch`/`write_file`
   los convierten en `\r\n\r\n` e insertan una línea en blanco tras **cada** línea (el archivo pasa de 3.068 a
   ~6.100 líneas sin dar ningún error). Editar con un script de Python: `raw.decode('utf-8').split('\r\r\n')`,
