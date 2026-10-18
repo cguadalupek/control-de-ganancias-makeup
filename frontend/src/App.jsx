@@ -199,84 +199,6 @@ function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAl
   return <BrandSelect value={value} onChange={onChange} options={options} placeholder={placeholder} icon={Store} />;
 }
 
-// FAB arrastrable: posición persistida en localStorage, distingue toque de arrastre
-function useDraggableFab({ storageKey, size = 56, defaultRight = 16, defaultBottom = 68, onTap }) {
-  const clamp = (p) => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
-    return {
-      x: Math.min(Math.max(8, p.x), Math.max(8, vw - size - 8)),
-      y: Math.min(Math.max(8, p.y), Math.max(8, vh - size - 8)),
-    };
-  };
-  const defaultPos = () => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
-    return clamp({ x: vw - size - defaultRight, y: vh - size - defaultBottom });
-  };
-  const readInitial = () => {
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (typeof saved.x === 'number' && typeof saved.y === 'number') return clamp(saved);
-      }
-    } catch (err) { /* almacenamiento no disponible */ }
-    return defaultPos();
-  };
-
-  const [pos, setPos] = useState(readInitial);
-  const posRef = useRef(pos);
-  const tapRef = useRef(onTap);
-  const drag = useRef({ active: false, moved: false, dx: 0, dy: 0, sx: 0, sy: 0 });
-
-  useEffect(() => { tapRef.current = onTap; });
-
-  const apply = (next) => { posRef.current = next; setPos(next); };
-
-  useEffect(() => {
-    const onResize = () => apply(clamp(posRef.current));
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handlers = {
-    onPointerDown: (e) => {
-      drag.current = {
-        active: true, moved: false,
-        dx: e.clientX - posRef.current.x, dy: e.clientY - posRef.current.y,
-        sx: e.clientX, sy: e.clientY,
-      };
-      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
-    },
-    onPointerMove: (e) => {
-      const d = drag.current;
-      if (!d.active) return;
-      if (!d.moved && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) d.moved = true;
-      if (!d.moved) return;
-      apply(clamp({ x: e.clientX - d.dx, y: e.clientY - d.dy }));
-    },
-    onPointerUp: (e) => {
-      const d = drag.current;
-      if (!d.active) return;
-      d.active = false;
-      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
-      if (d.moved) {
-        try { window.localStorage.setItem(storageKey, JSON.stringify(posRef.current)); } catch (err) { /* noop */ }
-      } else if (typeof tapRef.current === 'function') {
-        tapRef.current();
-      }
-    },
-    onPointerCancel: () => { drag.current.active = false; },
-  };
-
-  return { pos, style: { left: `${pos.x}px`, top: `${pos.y}px`, touchAction: 'none' }, handlers };
-}
 
 export default function App() {
   // Navegación por pestañas ('resumen' | 'productos' | 'informes')
@@ -886,9 +808,6 @@ export default function App() {
   const closeProducto = () => setShowProductModal(false);
   const openProductsList = () => setShowProductsListModal(true);
 
-  // FABs arrastrables (se recuerda dónde los deja la usuaria)
-  const serviceFab = useDraggableFab({ storageKey: 'salon_fab_servicio', onTap: () => setShowRegistroModal(true) });
-  const productFab = useDraggableFab({ storageKey: 'salon_fab_producto', onTap: () => setShowProductModal(true) });
 
   const anyModalOpen = showRegistroModal || showProductModal || showProductsListModal;
 
@@ -1310,7 +1229,7 @@ export default function App() {
       </aside>
 
       {/* ================= CABECERA MÓVIL COMPACTA (logo + selector de mes) ================= */}
-      <div className="md:hidden sticky top-0 z-30 bg-[#faf5f8]/95 backdrop-blur-md border-b border-[#ec71a8]/20 px-3 py-2 flex items-center justify-between gap-2">
+      <div className="md:hidden sticky top-0 z-30 bg-[#faf5f8]/95 backdrop-blur-md border-b border-[#ec71a8]/20 px-2.5 py-2 flex items-center justify-between gap-2">
         <button
           onClick={() => setActiveTab('resumen')}
           aria-label="Ir al resumen general"
@@ -1318,6 +1237,7 @@ export default function App() {
         >
           <BrandLogo compact />
         </button>
+        <div className="flex items-center gap-1.5 ml-auto min-w-0">
 
         {activeTab === 'resumen' ? (
           /* Selector compacto de mes: < Octubre 2026 > */
@@ -1325,7 +1245,7 @@ export default function App() {
             <button
               onClick={handlePrevDashboardMonth}
               aria-label="Mes anterior"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -1344,7 +1264,7 @@ export default function App() {
             <button
               onClick={handleNextDashboardMonth}
               aria-label="Mes siguiente"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -1355,6 +1275,18 @@ export default function App() {
             {activeTab === 'informes' && 'Informes'}
           </span>
         )}
+          {/* BOTON REGISTRAR: estatico, alineado al centro vertical del selector de mes */}
+          <button
+            type="button"
+            onClick={openRegistro}
+            aria-label="Registrar nuevo servicio"
+            title="Registrar nuevo servicio"
+            className="shrink-0 h-9 w-9 min-[380px]:w-auto min-[380px]:px-3.5 rounded-full border-0 bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 whitespace-nowrap shadow-[0_2px_12px_rgba(236,113,168,0.40)] active:scale-95 transition-transform"
+          >
+            <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
+            <span className="hidden min-[380px]:inline">Registrar</span>
+          </button>
+        </div>
       </div>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
@@ -1508,7 +1440,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               
               {/* RENDIMIENTO SEMANAL (SEMANAS 1 A 5) — solo desktop, en móvil se oculta para no alargar el scroll */}
-              <div className="hidden lg:flex card-luxury rounded-3xl p-6 lg:col-span-2 flex-col justify-between">
+              <div className="hidden lg:flex card-luxury rounded-3xl p-6 lg:col-span-3 flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-5">
                     <div className="flex items-center gap-2.5">
@@ -1537,7 +1469,7 @@ export default function App() {
                           <span className="text-[11px] font-extrabold text-[#1e1e1c] group-hover:text-[#ec71a8] transition-colors">
                             S/ {amount.toFixed(0)}
                           </span>
-                          <div className="w-full max-w-[48px] bg-[#fce3ed] rounded-2xl overflow-hidden p-1 flex flex-col justify-end border border-[#f9cee3]/50 h-32">
+                          <div className="w-full max-w-[96px] bg-[#fce3ed] rounded-2xl overflow-hidden p-1 flex flex-col justify-end border border-[#f9cee3]/50 h-32">
                             <div 
                               className={`w-full rounded-xl transition-all duration-500 ${
                                 amount > 0 
@@ -1982,20 +1914,20 @@ export default function App() {
                     Mostrando <span className="font-bold text-[#1e1e1c]">{(reportPage - 1) * itemsPerPage + 1}</span> a <span className="font-bold text-[#1e1e1c]">{Math.min(reportPage * itemsPerPage, filteredServices.length)}</span> de <span className="font-bold text-[#1e1e1c]">{filteredServices.length}</span> servicios
                   </div>
 
-                  <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-1.5 shadow-sm">
-                    <button onClick={() => setReportPage(1)} disabled={reportPage === 1} className="px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Inicio</button>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-1.5 shadow-sm">
+                    <button onClick={() => setReportPage(1)} disabled={reportPage === 1} className="hidden sm:block px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Inicio</button>
                     {/* Botón Página Anterior */}
                     <button
                       onClick={() => setReportPage((prev) => Math.max(prev - 1, 1))}
                       disabled={reportPage === 1}
-                      className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      className={`px-3 sm:px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
                         reportPage === 1
                           ? 'opacity-40 cursor-not-allowed border-[#fce3ed] text-[#8c8884]'
                           : 'bg-white hover:bg-[#fce3ed] border-[#f9cee3] text-[#1e1e1c] cursor-pointer shadow-xs hover:scale-105'
                       }`}
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
-                      Anterior
+                      <span className="hidden sm:inline">Anterior</span>
                     </button>
 
                     {/* Botones Numéricos de Página */}
@@ -2011,16 +1943,16 @@ export default function App() {
                     <button
                       onClick={() => setReportPage((prev) => Math.min(prev + 1, totalReportPages))}
                       disabled={reportPage === totalReportPages}
-                      className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      className={`px-3 sm:px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
                         reportPage === totalReportPages
                           ? 'opacity-40 cursor-not-allowed border-[#fce3ed] text-[#8c8884]'
                           : 'bg-white hover:bg-[#fce3ed] border-[#f9cee3] text-[#1e1e1c] cursor-pointer shadow-xs hover:scale-105'
                       }`}
                     >
-                      Siguiente
+                      <span className="hidden sm:inline">Siguiente</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setReportPage(totalReportPages)} disabled={reportPage === totalReportPages} className="px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Último</button>
+                    <button onClick={() => setReportPage(totalReportPages)} disabled={reportPage === totalReportPages} className="hidden sm:block px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35">Último</button>
                   </div>
                 </div>
               )}
@@ -2653,7 +2585,7 @@ export default function App() {
         )}
 
 
-      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas + FAB flotante) ================= */}
+      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas) ================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)] pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-3 items-end">
           <button
@@ -2683,21 +2615,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ================= FAB ARRASTRABLE: REGISTRAR SERVICIO (móvil, abajo a la derecha) ================= */}
-      {!anyModalOpen && activeTab === 'resumen' && (
-        <button
-          type="button"
-          {...serviceFab.handlers}
-          style={serviceFab.style}
-          aria-label="Registrar nuevo servicio"
-          title="Registrar servicio · mantén pulsado para mover"
-          className="md:hidden fixed z-40 h-12 px-4 rounded-full bg-gradient-to-r from-[#d94691] to-[#9333ea] text-white flex items-center justify-center gap-1.5 shadow-[0_0_22px_rgba(217,70,145,0.62)] ring-4 ring-white select-none cursor-grab active:cursor-grabbing text-sm font-extrabold"
-        >
-          <Plus className="w-4 h-4" strokeWidth={3} /> Registrar
-        </button>
-      )}
 
-      {/* ================= FAB EXCLUSIVO DE PRODUCTOS (negro & dorado) ================= */}
 
       {/* ================= MODAL INTERACTIVO DE EDICIÓN DE SERVICIO ================= */}
       {editingService && (
