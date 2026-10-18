@@ -62,7 +62,7 @@ const addMonthsYMD = (ymd, months) => {
 };
 
 // Monograma de Rodríguez: una R limpia y reconocible incluso en tamaños pequeños.
-function BrandLogo({ compact = false }) {
+function BrandLogo({ compact = false, onDark = false }) {
   return (
     <div className="flex items-center gap-3 select-none">
       <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#b64a83] via-[#933a69] to-[#7d4e32] p-0.5 shadow-md flex items-center justify-center shrink-0 border border-[#eec9a3]/70 group">
@@ -79,15 +79,15 @@ function BrandLogo({ compact = false }) {
       {!compact && (
         <div className="flex flex-col">
           <div className="flex items-baseline gap-1.5">
-            <span className="font-extrabold text-lg sm:text-xl tracking-[0.18em] text-[#1e1e1c] uppercase leading-none">
+            <span className={`font-extrabold text-lg sm:text-xl tracking-[0.18em] uppercase leading-none ${onDark ? 'text-white' : 'text-[#1e1e1c]'}`}>
               Rodríguez
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] font-bold tracking-[0.25em] text-[#6b6764] uppercase">
+            <span className={`text-[10px] font-bold tracking-[0.25em] uppercase ${onDark ? 'text-white/75' : 'text-[#6b6764]'}`}>
               MAKE UP
             </span>
-            <span className="font-brand-script text-[#ec71a8] text-base sm:text-lg leading-none transform -rotate-3">
+            <span className={`font-brand-script text-base sm:text-lg leading-none transform -rotate-3 ${onDark ? 'text-[#fce3ed]' : 'text-[#ec71a8]'}`}>
               Estudio
             </span>
           </div>
@@ -103,16 +103,18 @@ function BrandLogo({ compact = false }) {
 
 // Contador animado: los montos del Resumen suben de 0 al valor real al entrar
 // (rápido, con frenada suave; se salta la animación con prefers-reduced-motion).
-function AnimatedAmount({ value = 0, className = '', duration = 850 }) {
+function AnimatedAmount({ value = 0, className = '', duration = 850, animate = true }) {
   const target = Number(value) || 0;
-  const [shown, setShown] = useState(0);
+  const [shown, setShown] = useState(() => (animate ? 0 : target));
   const frameRef = useRef(0);
 
   useEffect(() => {
     const reduce = typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
-    if (reduce || duration <= 0) {
+    // animate=false (ya pasó la primera carga): el monto se muestra directo
+    if (!animate || reduce || duration <= 0) {
+      cancelAnimationFrame(frameRef.current);
       setShown(target);
       return undefined;
     }
@@ -127,7 +129,7 @@ function AnimatedAmount({ value = 0, className = '', duration = 850 }) {
     };
     frameRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameRef.current);
-  }, [target, duration]);
+  }, [target, duration, animate]);
 
   return <span className={className}>S/ {shown.toFixed(2)}</span>;
 }
@@ -479,6 +481,14 @@ export default function App() {
   const [editProdStatus, setEditProdStatus] = useState('activo');
 
   // Toast de notificación
+  // El contador de montos solo corre en la primera carga de la app: al volver de otra
+  // pestaña los montos aparecen ya con su valor.
+  const [animateCounters, setAnimateCounters] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setAnimateCounters(false), 1500);
+    return () => clearTimeout(t);
+  }, []);
+
   const [toastMsg, setToastMsg] = useState(null);
   const showToast = (text, type = 'success') => {
     setToastMsg({ text, type });
@@ -1281,11 +1291,11 @@ export default function App() {
       )}
 
       {/* ================= PANEL LATERAL (SIDEBAR) ================= */}
-      <aside className="hidden md:flex md:w-80 bg-white/95 backdrop-blur-md border-r border-[#ec71a8]/20 p-6 flex-col justify-between shrink-0 shadow-sm z-20">
+      <aside className="hidden md:flex md:w-80 bg-gradient-to-b from-[#b64a83] via-[#9d3f6f] to-[#6f2b4c] border-r border-white/15 p-6 flex-col justify-between shrink-0 shadow-xl shadow-[#933a69]/25 z-20">
         <div>
           {/* CABECERA CON LOGO PRINCIPAL */}
-          <div className="flex items-center justify-between md:justify-start pb-6 border-b border-[#fce3ed]">
-            <BrandLogo />
+          <div className="flex items-center justify-between md:justify-start pb-6 border-b border-white/20">
+            <BrandLogo onDark />
             {/* BOTÓN MENÚ MÓVIL */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -1296,12 +1306,12 @@ export default function App() {
           </div>
 
           {/* INSIGNIA DE ESTILO */}
-          <div className="mt-4 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#fce3ed] via-[#fdf2f7] to-[#fdebdd] border border-[#f9cee3] flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-wider uppercase text-[#1e1e1c] flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#ec71a8]" />
+          <div className="mt-4 px-3.5 py-2 rounded-xl bg-white/15 border border-white/25 flex items-center justify-between">
+            <span className="text-[11px] font-bold tracking-wider uppercase text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#fce3ed]" />
               Control de Ganancias
             </span>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#ec71a8] text-white shadow-xs">
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white text-[#933a69] shadow-xs">
               PRO
             </span>
           </div>
@@ -1314,16 +1324,16 @@ export default function App() {
               onClick={() => { setActiveTab('resumen'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'resumen'
-                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
-                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
+                  ? 'bg-white text-[#933a69] shadow-lg shadow-black/25 translate-x-1'
+                  : 'text-white/90 hover:bg-white/15 hover:text-white'
               }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'resumen' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'resumen' ? 'bg-[#fce3ed] text-[#b64a83]' : 'bg-white/15 text-white'}`}>
                 <LayoutDashboard className="w-4 h-4" />
               </div>
               <div className="text-left flex-1">
                 <span className="block font-extrabold">Resumen General</span>
-                <span className={`text-[11px] block font-medium ${activeTab === 'resumen' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                <span className={`text-[11px] block font-medium ${activeTab === 'resumen' ? 'text-[#933a69]/80' : 'text-white/70'}`}>
                   Métricas del mes en curso
                 </span>
               </div>
@@ -1334,16 +1344,16 @@ export default function App() {
               onClick={openRegistro}
               className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 showRegistroModal
-                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
-                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
+                  ? 'bg-white text-[#933a69] shadow-lg shadow-black/25 translate-x-1'
+                  : 'text-white/90 hover:bg-white/15 hover:text-white'
               }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${showRegistroModal ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${showRegistroModal ? 'bg-[#fce3ed] text-[#b64a83]' : 'bg-white/15 text-white'}`}>
                 <PlusCircle className="w-4 h-4" />
               </div>
               <div className="text-left flex-1">
                 <span className="block font-extrabold">Registrar Servicio</span>
-                <span className={`text-[11px] block font-medium ${showRegistroModal ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                <span className={`text-[11px] block font-medium ${showRegistroModal ? 'text-[#933a69]/80' : 'text-white/70'}`}>
                   Ingreso rápido & cálculo
                 </span>
               </div>
@@ -1354,16 +1364,16 @@ export default function App() {
               onClick={() => { setActiveTab('informes'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'informes'
-                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
-                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
+                  ? 'bg-white text-[#933a69] shadow-lg shadow-black/25 translate-x-1'
+                  : 'text-white/90 hover:bg-white/15 hover:text-white'
               }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'informes' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'informes' ? 'bg-[#fce3ed] text-[#b64a83]' : 'bg-white/15 text-white'}`}>
                 <FileText className="w-4 h-4" />
               </div>
               <div className="text-left flex-1">
                 <span className="block font-extrabold">Informes & Edición</span>
-                <span className={`text-[11px] block font-medium ${activeTab === 'informes' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                <span className={`text-[11px] block font-medium ${activeTab === 'informes' ? 'text-[#933a69]/80' : 'text-white/70'}`}>
                   Historial, filtros y cambios
                 </span>
               </div>
@@ -1374,16 +1384,16 @@ export default function App() {
               onClick={() => { setActiveTab('productos'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                 activeTab === 'productos'
-                  ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
-                  : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
+                  ? 'bg-white text-[#933a69] shadow-lg shadow-black/25 translate-x-1'
+                  : 'text-white/90 hover:bg-white/15 hover:text-white'
               }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'productos' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'productos' ? 'bg-[#fce3ed] text-[#b64a83]' : 'bg-white/15 text-white'}`}>
                 <Package className="w-4 h-4" />
               </div>
               <div className="text-left flex-1">
                 <span className="block font-extrabold">Mis Productos</span>
-                <span className={`text-[11px] block font-medium ${activeTab === 'productos' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                <span className={`text-[11px] block font-medium ${activeTab === 'productos' ? 'text-[#933a69]/80' : 'text-white/70'}`}>
                   Inventario y vencimientos
                 </span>
               </div>
@@ -1393,9 +1403,9 @@ export default function App() {
         </div>
 
         {/* PIE DEL PANEL LATERAL */}
-        <div className="hidden md:block pt-6 border-t border-[#fce3ed] mt-6">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1e1e1c] to-[#2c2b28] text-white relative overflow-hidden shadow-md">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#ec71a8]/20 rounded-full blur-xl"></div>
+        <div className="hidden md:block pt-6 border-t border-white/20 mt-6">
+          <div className="p-4 rounded-2xl bg-[#2a1a25]/85 border border-white/10 text-white relative overflow-hidden shadow-md">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#ec71a8]/30 rounded-full blur-xl"></div>
             <div className="flex items-center gap-2 text-[#ecc880] mb-1">
               <Award className="w-4 h-4" />
               <span className="text-xs font-bold uppercase tracking-wider">Meta Mensual</span>
@@ -1477,7 +1487,8 @@ export default function App() {
       <main className="flex-1 px-3 py-4 sm:p-8 pb-24 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-4 sm:gap-8">
 
         {/* BARRA DE TÍTULO + CONTROL DE MES (compacta, solo desktop) */}
-        <header className="hidden md:flex relative items-center justify-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-2xl px-5 py-3.5 shadow-sm">
+        {/* min-h para que la caja mida igual en Resumen, Productos e Informes (el título va absoluto) */}
+        <header className="hidden md:flex relative items-center justify-center gap-4 min-h-[60px] bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-2xl px-5 py-3.5 shadow-sm">
           <h2 className="absolute left-5 text-base lg:text-lg font-extrabold text-[#1e1e1c] tracking-tight">
             {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
             {activeTab === 'productos' && 'Registro y Control de Productos'}
@@ -1552,7 +1563,7 @@ export default function App() {
                 </div>
                 <div className="mt-3 sm:mt-5">
                   <div className="text-3xl sm:text-5xl font-black text-[#1e1e1c] tracking-tight whitespace-nowrap">
-                    <AnimatedAmount value={monthMyGain} />
+                    <AnimatedAmount value={monthMyGain} animate={animateCounters} />
                   </div>
                   <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ec71a8] shrink-0"></span>
@@ -1573,7 +1584,7 @@ export default function App() {
                 </div>
                 <div className="mt-3 sm:mt-5">
                   <div className="text-xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight whitespace-nowrap">
-                    <AnimatedAmount value={monthFacturado} />
+                    <AnimatedAmount value={monthFacturado} animate={animateCounters} />
                   </div>
                   <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764]">
                     {monthlyServices.length} {monthlyServices.length === 1 ? 'servicio en el mes' : 'servicios en el mes'}
@@ -1595,7 +1606,7 @@ export default function App() {
                 <div className="mt-3 sm:mt-5">
                   <div className="text-sm sm:text-3xl font-black text-[#1e1e1c] leading-tight break-words">
                     {monthRemainingGoal > 0 ? (
-                      <span>Faltan <AnimatedAmount value={monthRemainingGoal} /></span>
+                      <span>Faltan <AnimatedAmount value={monthRemainingGoal} animate={animateCounters} /></span>
                     ) : (
                       <span className="text-[#ec71a8] flex flex-wrap items-center gap-1">
                         ¡Meta Cumplida! <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#ecc880] shrink-0" />
@@ -1687,7 +1698,7 @@ export default function App() {
                   className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#f3b4d4] bg-gradient-to-br from-[#fff6fb] to-[#efd3e4] shadow-lg shadow-[#b64a83]/10 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#933a69]">Ganancia Neta</span><Store className="w-5 h-5 text-[#b64a83]" /></div>
-                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Salón Vanidades</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={vanidadesNetGain} /></p>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Salón Vanidades</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={vanidadesNetGain} animate={animateCounters} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#933a69]">Ver en Informes →</p>
                 </button>
                 <button
@@ -1697,7 +1708,7 @@ export default function App() {
                   className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#eec9a3] bg-gradient-to-br from-[#fffaf4] to-[#f6e9df] shadow-lg shadow-[#c89b6b]/15 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#7d4e32]">Ganancia Neta</span><Store className="w-5 h-5 text-[#c89b6b]" /></div>
-                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Maison Studio</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={maisonNetGain} /></p>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">Maison Studio</p><p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={maisonNetGain} animate={animateCounters} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#7d4e32]">Ver en Informes →</p>
                 </button>
                 {/* Mis ganancias independientes (entidad propia Rodriguez Makeup, 100%) */}
@@ -1709,7 +1720,7 @@ export default function App() {
                 >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#b64a83]">Ganancia Neta · Propia</span><Sparkles className="w-5 h-5 text-[#ec71a8]" /></div>
                   <p className="mt-4 text-sm font-semibold text-[#6b6764]">{independienteNombre} · Mi entidad propia - 100%</p>
-                  <p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={independienteNetGain} /></p>
+                  <p className="text-3xl font-black text-[#2a1a25]"><AnimatedAmount value={independienteNetGain} animate={animateCounters} /></p>
                   <p className="mt-3 text-[11px] font-extrabold text-[#b64a83]">
                     {independienteServicios.length} {independienteServicios.length === 1 ? 'servicio propio' : 'servicios propios'} · Ver en Informes →
                   </p>
@@ -1808,7 +1819,9 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-in fade-in duration-300">
 
             {/* SECCIÓN DE FILTROS */}
-            <section className="card-luxury relative z-30 overflow-visible rounded-3xl p-4 sm:p-7 flex flex-col gap-4 sm:gap-5">
+            {/* z-10 en móvil: por debajo de la cabecera sticky (z-30); z-30 en escritorio para que los
+                desplegables queden por encima de la tabla de historial. */}
+            <section className="card-luxury relative z-10 md:z-30 overflow-visible rounded-3xl p-4 sm:p-7 flex flex-col gap-4 sm:gap-5">
               <div className="flex items-center gap-3 border-b border-[#fce3ed] pb-3.5">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center shrink-0">
                   <CalendarRange className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -2895,31 +2908,34 @@ export default function App() {
 
 
       {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas) ================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)] pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-[#b64a83] via-[#a3416f] to-[#8f3663] backdrop-blur-md border-t border-white/15 shadow-[0_-6px_22px_rgba(147,58,105,0.35)] pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-3 items-end">
           <button
             onClick={() => setActiveTab('resumen')}
             aria-label="Resumen general"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'resumen' ? 'text-white' : 'text-white/55'}`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span className="text-[10px] font-bold">Resumen</span>
+            <span className={`h-0.5 w-6 rounded-full ${activeTab === 'resumen' ? 'bg-white' : 'bg-transparent'}`}></span>
           </button>
           <button
             onClick={() => setActiveTab('productos')}
             aria-label="Mis productos"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'productos' ? 'text-white' : 'text-white/55'}`}
           >
             <Package className="w-5 h-5" />
             <span className="text-[10px] font-bold">Productos</span>
+            <span className={`h-0.5 w-6 rounded-full ${activeTab === 'productos' ? 'bg-white' : 'bg-transparent'}`}></span>
           </button>
           <button
             onClick={() => setActiveTab('informes')}
             aria-label="Informes y edición"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'informes' ? 'text-white' : 'text-white/55'}`}
           >
             <FileText className="w-5 h-5" />
             <span className="text-[10px] font-bold">Informes</span>
+            <span className={`h-0.5 w-6 rounded-full ${activeTab === 'informes' ? 'bg-white' : 'bg-transparent'}`}></span>
           </button>
         </div>
       </nav>

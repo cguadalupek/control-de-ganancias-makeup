@@ -48,7 +48,12 @@ El porcentaje se normaliza (`40` o `0.40` → 40 %). Ganancia personal = precio 
 ## Estructura de la UI
 
 - **Tres vistas:** `resumen` · `productos` · `informes`. En móvil son pestañas de la barra inferior; en
-  escritorio, ítems del sidebar (más "Registrar Servicio", que abre el modal).
+  escritorio, ítems del sidebar (más "Registrar Servicio", que abre el modal). El **sidebar (escritorio) y la
+  barra inferior (móvil) van en degradado berry** (`from-[#b64a83] via-[#9d3f6f] to-[#6f2b4c]` en vertical,
+  `from-[#b64a83] via-[#a3416f] to-[#8f3663]` en horizontal) con textos e iconos claros: el ítem activo es
+  una píldora **blanca con texto berry** y los inactivos `text-white/90` (icono `bg-white/15`). El logo del
+  sidebar usa `<BrandLogo onDark />` (wordmark en blanco). La **cabecera superior de móvil sigue clara**
+  porque ahí vive el botón Registrar rosa.
 - **Barra superior móvil (sticky, `md:hidden`):** logo + selector de mes `‹ Mes Año ›` + botón
   **Registrar** (rosa con degradado y resplandor `.glow-rose`). El botón **solo aparece en Resumen**
   (`activeTab === 'resumen' &&`), mide 44 px de alto y por debajo de 380 px se muestra solo con el icono `+`.
@@ -83,8 +88,9 @@ El porcentaje se normaliza (`40` o `0.40` → 40 %). Ganancia personal = precio 
   `input[type=date]` nativo.
 - `AnimatedAmount` — contador animado (`0 → valor` en ~850 ms con frenada `ease-out`) que usan **todos los
   montos del Resumen** (Mi Ganancia Neta, Total Facturado, "Faltan S/ …" y las tres ganancias por salón).
-  Se re-anima al cambiar de mes o cuando llegan los datos del backend; con `prefers-reduced-motion` muestra
-  el valor directo.
+  **Solo se anima al abrir la app**: `animate={animateCounters}`, que arranca en `true` y se apaga 1.5 s
+  después del montaje de `App`; al volver de otra pestaña (o al cambiar de mes) el monto aparece directo.
+  Con `prefers-reduced-motion` muestra el valor sin rampa.
 - `BrandLogo` — monograma + wordmark (`compact` para la barra móvil).
 
 ## Despliegue (desde Windows con plink)
@@ -186,6 +192,11 @@ viewport y que la consola quede sin errores.
 
 ## Pitfalls conocidos
 
+- **Cabecera sticky de móvil vs secciones:** la cabecera es `sticky top-0 z-30` y la sección de filtros de
+  Informes era también `relative z-30`; con el mismo z-index gana **el que va después en el DOM**, así que al
+  deslizar la tarjeta tapaba el logo y el título. La sección de filtros usa `z-10 md:z-30` (en móvil queda por
+  debajo de la cabecera; en escritorio no hay cabecera sticky y sus desplegables deben ir por encima de la
+  tabla). Comprobar con `document.elementFromPoint` en el centro de la cabecera tras `window.scrollTo`.
 - **Tailwind: una variante pisa la utilidad base del mismo grupo.** `sm:p-3.5` se emite después de `pl-9`,
   así que en escritorio el `padding-left` acababa en 14 px y el texto del campo "Nombre del servicio"
   chocaba con el icono de la lupa. Regla: en inputs con icono superpuesto, el padding lateral va **con la
