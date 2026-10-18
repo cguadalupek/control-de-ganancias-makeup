@@ -135,3 +135,24 @@
 .glow-gold {
   animation: goldGlow 3s infinite ease-in-out;
 }
+
+/* Resplandor rosa pulsante del botón "Registrar" de la barra móvil */
+@keyframes roseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(236, 113, 168, 0.55), 0 0 14px rgba(236, 113, 168, 0.55), 0 4px 14px rgba(217, 70, 145, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(236, 113, 168, 0.14), 0 0 28px rgba(217, 70, 145, 0.85), 0 4px 20px rgba(217, 70, 145, 0.5);
+  }
+}
+
+.glow-rose {
+  animation: roseGlow 2.2s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-rose {
+    animation: none;
+    box-shadow: 0 0 16px rgba(236, 113, 168, 0.7), 0 4px 16px rgba(217, 70, 145, 0.4);
+  }
+}

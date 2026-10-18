@@ -119,7 +119,7 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
   const selected = options.find((o) => String(o.value) === String(value));
 
   return (
-    <div ref={ref} className="relative z-[70]">
+    <div ref={ref} className={`relative ${open ? 'z-[95]' : 'z-[70]'}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -199,6 +199,156 @@ function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAl
   return <BrandSelect value={value} onChange={onChange} options={options} placeholder={placeholder} icon={Store} />;
 }
 
+
+// ================= CALENDARIO CON ESTILO DE MARCA =================
+// Sustituye al picker nativo (plano): cabecera en degradado rosa, dia de hoy
+// y dia seleccionado resaltados, y un pie con "Hoy" / "Limpiar".
+const MONTH_NAMES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+const MONTH_SHORT_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const WEEKDAY_SHORT_ES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+
+const dateToYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const ymdToDate = (ymd) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+};
+
+const formatYMDPretty = (ymd) => {
+  const d = ymdToDate(ymd);
+  if (!d) return '';
+  return `${d.getDate()} ${MONTH_SHORT_ES[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+function BrandDateField({ ariaLabel = 'Elegir fecha', align = 'left', value, onChange, icon: Icon = CalendarDays, placeholder = 'Elegir fecha' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const today = new Date();
+  const todayYMD = dateToYMD(today);
+  const selected = ymdToDate(value);
+  const [viewYear, setViewYear] = useState((selected || today).getFullYear());
+  const [viewMonth, setViewMonth] = useState((selected || today).getMonth());
+
+  useEffect(() => {
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  const openCalendar = () => {
+    const base = selected || today;
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+    setOpen(true);
+  };
+
+  const shiftMonth = (delta) => {
+    const next = new Date(viewYear, viewMonth + delta, 1);
+    setViewYear(next.getFullYear());
+    setViewMonth(next.getMonth());
+  };
+
+  // Rejilla con la semana empezando en lunes
+  const firstWeekday = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i += 1) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
+  const selectedYMD = selected ? dateToYMD(selected) : '';
+
+  return (
+    <div ref={ref} className={`relative ${open ? 'z-[95]' : 'z-[70]'}`}>
+      <button
+        type="button"
+        onClick={() => (open ? setOpen(false) : openCalendar())}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 border rounded-xl text-xs sm:text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
+          open
+            ? 'border-[#d94691] bg-white ring-2 ring-[#d94691]/20 shadow-[0_0_18px_rgba(217,70,145,0.22)]'
+            : 'border-[#e8a1c6] bg-gradient-to-br from-[#fff6fb] to-white shadow-[0_0_14px_rgba(217,70,145,0.10)] hover:border-[#d94691]/70'
+        }`}
+      >
+        <span className={`flex items-center gap-2 min-w-0 ${value ? 'text-[#2a1a25]' : 'text-[#8c8884]'}`}>
+          <Icon className="w-4 h-4 shrink-0 text-[#d94691]" />
+          <span className="truncate">{value ? formatYMDPretty(value) : placeholder}</span>
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 text-[#b64a83] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className={`absolute mt-2 z-[95] w-[min(84vw,18rem)] rounded-3xl border border-[#f9cee3] bg-white shadow-[0_22px_45px_-15px_rgba(182,74,131,0.55)] overflow-hidden animate-modal ${align === 'right' ? 'right-0' : 'left-0'}`}>
+          <div className="relative bg-gradient-to-r from-[#ec71a8] via-[#d95392] to-[#b64a83] px-2.5 py-2.5 flex items-center justify-between gap-2">
+            <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top_right,white,transparent_60%)]"></div>
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Mes anterior" className="relative z-10 w-8 h-8 rounded-xl bg-white/25 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="relative z-10 text-center">
+              <div className="text-white text-sm font-extrabold capitalize leading-none">{MONTH_NAMES_ES[viewMonth]} {viewYear}</div>
+              <div className="text-[9px] font-bold uppercase tracking-widest text-white/80 mt-1">Elegir día</div>
+            </div>
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="Mes siguiente" className="relative z-10 w-8 h-8 rounded-xl bg-white/25 hover:bg-white/40 text-white flex items-center justify-center cursor-pointer transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 px-2.5 pt-3">
+            {WEEKDAY_SHORT_ES.map((d) => (
+              <span key={d} className="text-center text-[10px] font-black uppercase tracking-wide text-[#b64a83]">{d}</span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 px-2.5 pb-2.5 pt-1.5">
+            {cells.map((day, index) => {
+              if (day === null) return <span key={`empty-${index}`} />;
+              const cellYMD = `${viewYear}-${pad2(viewMonth + 1)}-${pad2(day)}`;
+              const isSelected = cellYMD === selectedYMD;
+              const isToday = cellYMD === todayYMD;
+              return (
+                <button
+                  key={cellYMD}
+                  type="button"
+                  onClick={() => { onChange(cellYMD); setOpen(false); }}
+                  className={`h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white shadow-md shadow-[#ec71a8]/40 scale-105'
+                      : isToday
+                        ? 'border border-[#ec71a8] text-[#ec71a8] bg-[#fce3ed]'
+                        : 'text-[#4a4744] hover:bg-[#fce3ed] hover:text-[#1e1e1c]'
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-[#fce3ed] bg-[#fff9fc] px-2.5 py-2.5">
+            <button type="button" onClick={() => { onChange(todayYMD); setOpen(false); }} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white text-[11px] font-extrabold cursor-pointer shadow-sm">
+              Hoy
+            </button>
+            {value ? (
+              <button type="button" onClick={() => { onChange(''); setOpen(false); }} className="px-3 py-1.5 rounded-xl border border-[#f9cee3] bg-white text-[#8c8884] text-[11px] font-extrabold cursor-pointer hover:text-[#1e1e1c]">
+                Limpiar
+              </button>
+            ) : (
+              <span className="text-[10px] font-semibold text-[#8c8884]">Toca un día del calendario</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   // Navegación por pestañas ('resumen' | 'productos' | 'informes')
@@ -1252,9 +1402,9 @@ export default function App() {
             <button
               onClick={isViewingCurrentMonth ? undefined : handleCurrentDashboardMonth}
               aria-label={isViewingCurrentMonth ? 'Mes en curso' : 'Volver al mes actual'}
-              className={`px-1 min-w-0 text-center ${isViewingCurrentMonth ? '' : 'cursor-pointer'}`}
+              className={`px-0.5 min-w-0 text-center ${isViewingCurrentMonth ? '' : 'cursor-pointer'}`}
             >
-              <span className="block font-extrabold text-xs text-[#1e1e1c] capitalize whitespace-nowrap">
+              <span className="block font-extrabold text-[11px] text-[#1e1e1c] capitalize whitespace-nowrap">
                 {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
               </span>
               <span className={`block text-[9px] font-bold leading-tight ${isViewingCurrentMonth ? 'text-[#8c8884]' : 'text-[#ec71a8]'}`}>
@@ -1275,17 +1425,19 @@ export default function App() {
             {activeTab === 'informes' && 'Informes'}
           </span>
         )}
-          {/* BOTON REGISTRAR: estatico, alineado al centro vertical del selector de mes */}
-          <button
-            type="button"
-            onClick={openRegistro}
-            aria-label="Registrar nuevo servicio"
-            title="Registrar nuevo servicio"
-            className="shrink-0 h-9 w-9 min-[380px]:w-auto min-[380px]:px-3.5 rounded-full border-0 bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 whitespace-nowrap shadow-[0_2px_12px_rgba(236,113,168,0.40)] active:scale-95 transition-transform"
-          >
-            <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
-            <span className="hidden min-[380px]:inline">Registrar</span>
-          </button>
+          {/* BOTON REGISTRAR: solo en Resumen, grande y con resplandor rosa */}
+          {activeTab === 'resumen' && (
+            <button
+              type="button"
+              onClick={openRegistro}
+              aria-label="Registrar nuevo servicio"
+              title="Registrar nuevo servicio"
+              className="shrink-0 h-11 w-11 min-[380px]:w-auto min-[380px]:px-4 rounded-full border-0 bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 whitespace-nowrap glow-rose active:scale-95 transition-transform"
+            >
+              <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
+              <span className="hidden min-[380px]:inline">Registrar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1649,21 +1801,23 @@ export default function App() {
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 items-end">
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-bold text-[#6b6764]">Desde</label>
-                    <input
-                      type="date"
+                    <BrandDateField
+                      ariaLabel="Fecha desde"
+                      align="left"
+                      placeholder="Desde"
                       value={filterFrom}
-                      onChange={(e) => { setFilterFrom(e.target.value); setQuickRange('custom'); }}
-                      className="p-2.5 sm:p-3 border border-[#e8a1c6] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-gradient-to-br from-[#fff6fb] to-white focus:border-[#d94691] focus:ring-2 focus:ring-[#d94691]/20 shadow-[0_0_14px_rgba(217,70,145,0.10)]"
+                      onChange={(v) => { setFilterFrom(v); setQuickRange('custom'); }}
                     />
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-bold text-[#6b6764]">Hasta</label>
-                    <input
-                      type="date"
+                    <BrandDateField
+                      ariaLabel="Fecha hasta"
+                      align="right"
+                      placeholder="Hasta"
                       value={filterTo}
-                      onChange={(e) => { setFilterTo(e.target.value); setQuickRange('custom'); }}
-                      className="p-2.5 sm:p-3 border border-[#e8a1c6] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-gradient-to-br from-[#fff6fb] to-white focus:border-[#d94691] focus:ring-2 focus:ring-[#d94691]/20 shadow-[0_0_14px_rgba(217,70,145,0.10)]"
+                      onChange={(v) => { setFilterTo(v); setQuickRange('custom'); }}
                     />
                   </div>
 
