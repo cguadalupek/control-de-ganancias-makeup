@@ -90,6 +90,20 @@ tar czf - . --exclude=data --exclude=node_modules | plink -ssh -pw PASSWORD -hos
 - Los LXCs 113 y 103 tienen una clave SSH entre ellos (`/root/.ssh/id_ed25519` en el 113), útil para copiar
   datos directamente con `scp`/`tar | ssh` sin pasar por Windows.
 
+### Push a GitHub (desde el propio 113)
+
+`origin` es SSH (`git@github.com:cguadalupek/control-de-ganancias-makeup.git`) y autentica con una
+**deploy key** con permiso de escritura, así que el push se hace directamente desde el LXC:
+
+```bash
+cd /opt/salon-app && git add -A && git commit -m "tipo(scope): mensaje" && git push origin main
+```
+
+- El repo **no** versiona `node_modules/`, `frontend/dist/` ni `data/salon.db` (artefactos y datos reales):
+  al tocar la interfaz solo aparece `frontend/src/*` en el commit, y la base de datos deja el árbol limpio.
+- `/backups/` está ignorado (tarballs locales de seguridad).
+- Verificar tras el push: `git ls-remote origin` debe mostrar el mismo SHA que `git rev-parse HEAD`.
+
 ## Caché y PWA
 
 - nginx: `location = /index.html` → `no-cache`; `/assets/` (con hash) → `immutable, max-age=1y`.
