@@ -27,6 +27,8 @@ else:
     os.makedirs("./data", exist_ok=True)
     DB_PATH = "./data/salon.db"
 
+PROPIO_SALON_NOMBRE = "Rodriguez Makeup"  # entidad propia: sin comisión, 100% para la maquilladora
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -47,19 +49,39 @@ def init_db():
     """)
     
     # Tabla de salones / establecimientos donde trabaja la maquilladora
+    # "propio" = 1 -> entidad propia (Rodriguez Makeup): el 100% de la ganancia es suyo.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS salones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL UNIQUE
+            nombre TEXT NOT NULL UNIQUE,
+            propio INTEGER NOT NULL DEFAULT 0
         )
     """)
-    # Precargar los salones con IDs estables (1=Vanidades, 2=Maison Studio)
+    # Migración: agregar "propio" a tablas preexistentes (los salones antiguos no son propios)
+    cursor.execute("PRAGMA table_info(salones)")
+    salon_cols = [row[1] for row in cursor.fetchall()]
+    if "propio" not in salon_cols:
+        cursor.execute("ALTER TABLE salones ADD COLUMN propio INTEGER NOT NULL DEFAULT 0")
+
+    # Precargar los salones con IDs estables (1=Vanidades, 2=Maison Studio, 3=Rodriguez Makeup)
     cursor.execute("SELECT COUNT(*) FROM salones")
     if cursor.fetchone()[0] == 0:
         cursor.executemany(
-            "INSERT INTO salones (id, nombre) VALUES (?, ?)",
-            [(1, "Vanidades"), (2, "Maison Studio")]
+            "INSERT INTO salones (id, nombre, propio) VALUES (?, ?, ?)",
+            [(1, "Vanidades", 0), (2, "Maison Studio", 0), (3, PROPIO_SALON_NOMBRE, 1)]
         )
+
+    # La entidad propia existe siempre (idempotente) y queda marcada como propia
+    cursor.execute("SELECT id FROM salones WHERE nombre = ?", (PROPIO_SALON_NOMBRE,))
+    propio_row = cursor.fetchone()
+    if propio_row:
+        cursor.execute("UPDATE salones SET propio = 1 WHERE id = ?", (propio_row["id"],))
+    else:
+        cursor.execute("SELECT COUNT(*) FROM salones WHERE id = 3")
+        if cursor.fetchone()[0]:
+            cursor.execute("INSERT INTO salones (nombre, propio) VALUES (?, 1)", (PROPIO_SALON_NOMBRE,))
+        else:
+            cursor.execute("INSERT INTO salones (id, nombre, propio) VALUES (3, ?, 1)", (PROPIO_SALON_NOMBRE,))
 
     # Tabla de registros de servicios realizados
     cursor.execute("""
@@ -214,6 +236,17 @@ def salon_nombre(salon_id: int) -> Optional[str]:
     conn.close()
     return row["nombre"] if row else None
 
+def salon_es_propio(salon_id: int) -> bool:
+    """True si el salón es una entidad propia (Rodriguez Makeup): comisión 100%."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT nombre, COALESCE(propio, 0) AS propio FROM salones WHERE id = ?", (salon_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return False
+    return bool(row["propio"]) or "rodriguez" in (row["nombre"] or "").lower()
+
 # Endpoints API
 @app.get("/catalogo")
 def obtener_catalogo():
@@ -228,10 +261,10 @@ def obtener_catalogo():
 def obtener_salones():
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, nombre FROM salones ORDER BY id ASC")
+    cursor.execute("SELECT id, nombre, COALESCE(propio, 0) AS propio FROM salones ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r["id"], "nombre": r["nombre"]} for r in rows]
+    return [{"id": r["id"], "nombre": r["nombre"], "propio": bool(r["propio"])} for r in rows]
 
 @app.get("/servicios")
 def listar_servicios(desde: Optional[str] = Query(None), hasta: Optional[str] = Query(None),
@@ -319,6 +352,13 @@ def registrar_servicio(data: ServicioCreate):
     if not nombre_salon:
         raise HTTPException(status_code=400, detail="Salón/estudio no válido")
 
+    # Entidad propia (Rodriguez Makeup): sin comisión, el 100% es de la maquilladora.
+    if salon_es_propio(data.salon_id):
+        pct_decimal = 1.0
+        pct_display = 100
+        ganancia_personal = round(data.precio, 2)
+        ganancia_salon = 0.0
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -372,6 +412,7 @@ def registrar_servicios_lote(data: ServicioLote):
         raise HTTPException(status_code=400, detail="Salón/estudio no válido")
 
     semana = calcular_semana_mes(fecha_obj)
+    es_propio = salon_es_propio(data.salon_id)
     conn = get_db()
     cursor = conn.cursor()
     entries = []
@@ -381,6 +422,13 @@ def registrar_servicios_lote(data: ServicioLote):
             pct_display = int(round(pct_decimal * 100))
             ganancia_personal = round(item.precio * pct_decimal, 2)
             ganancia_salon = round(item.precio - ganancia_personal, 2)
+
+            # Entidad propia: sin comisión, el 100% es de la maquilladora.
+            if es_propio:
+                pct_decimal = 1.0
+                pct_display = 100
+                ganancia_personal = round(item.precio, 2)
+                ganancia_salon = 0.0
 
             cursor.execute("""
                 INSERT INTO registro_servicios
@@ -440,6 +488,13 @@ def actualizar_servicio(id: int, data: ServicioCreate):
     nombre_salon = salon_nombre(data.salon_id)
     if not nombre_salon:
         raise HTTPException(status_code=400, detail="Salón/estudio no válido")
+
+    # Entidad propia (Rodriguez Makeup): sin comisión, el 100% es de la maquilladora.
+    if salon_es_propio(data.salon_id):
+        pct_decimal = 1.0
+        pct_display = 100
+        ganancia_personal = round(data.precio, 2)
+        ganancia_salon = 0.0
 
     conn = get_db()
     cursor = conn.cursor()

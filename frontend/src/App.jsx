@@ -38,8 +38,7 @@ import {
   Tag,
   ShoppingBag,
   Edit3,
-  Save,
-  Download
+  Save
 } from 'lucide-react';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
@@ -184,6 +183,7 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
 function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAll = false }) {
   const descSalon = (s) => {
     if (!s || !s.nombre) return '';
+    if (s.propio || /rodriguez/i.test(s.nombre)) return 'Mi entidad propia · 100% para mí';
     return /maison/i.test(s.nombre) ? 'Solo Maquillaje · 60%' : 'Maquillaje 40% · otros 30%';
   };
 
@@ -424,6 +424,7 @@ export default function App() {
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState('activo'); // 'activo' | 'terminado' | 'todos'
   const [productLoading, setProductLoading] = useState(false);
+  const [productPage, setProductPage] = useState(1); // paginación del inventario (9 por página)
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false); // modal superpuesto de registro de producto
   const [showProductsListModal, setShowProductsListModal] = useState(false);
@@ -448,8 +449,6 @@ export default function App() {
 
   // Toast de notificación
   const [toastMsg, setToastMsg] = useState(null);
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const showToast = (text, type = 'success') => {
     setToastMsg({ text, type });
     setTimeout(() => setToastMsg(null), 4000);
@@ -502,34 +501,6 @@ export default function App() {
     localStorage.setItem('salon_services', JSON.stringify(services));
   }, [services]);
 
-  // PWA: el navegador entrega este evento solo cuando la instalación está disponible.
-  useEffect(() => {
-    const onBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setDeferredInstallPrompt(event);
-      setShowInstallBanner(true);
-    };
-    const onInstalled = () => {
-      setDeferredInstallPrompt(null);
-      setShowInstallBanner(false);
-      localStorage.setItem('rodriguez_pwa_installed', 'true');
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
-
-  const installApp = async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    setDeferredInstallPrompt(null);
-    setShowInstallBanner(false);
-  };
-
   // Auxiliar semana
   const getWeekOfMonth = (dateString) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -548,7 +519,14 @@ export default function App() {
     const s = salonById(id);
     return s ? /maison/i.test(s.nombre) : Number(id) === 2;
   };
+  // Entidad propia (Rodriguez Makeup): el servicio es 100% mío, sin comisión del salón.
+  const esPropio = (id) => {
+    if (id === '' || id === null || id === undefined) return false;
+    const s = salonById(id);
+    return s ? Boolean(s.propio) || /rodriguez/i.test(s.nombre || '') : false;
+  };
   const comisionSugerida = (salonId, servicio) => {
+    if (esPropio(salonId)) return 100; // mi entidad propia: sin comisión
     if (esMaison(salonId)) return 60; // Maison Studio: solo Maquillaje
     return /maquillaje/i.test((servicio || '').trim()) ? 40 : 30; // Vanidades
   };
@@ -565,7 +543,9 @@ export default function App() {
   // Cambio de salón en el formulario: recalcula comisión y, en Maison, fuerza Maquillaje
   const handleRegSalonChange = (val) => {
     setRegSalonId(val);
-    if (esMaison(val)) {
+    if (esPropio(val)) {
+      setRegCommission(100); // comisión bloqueada: todo es mío
+    } else if (esMaison(val)) {
       setRegService('Maquillaje');
       setRegCommission(60);
     } else {
@@ -574,7 +554,9 @@ export default function App() {
   };
   const handleRegServiceChange = (val) => {
     setRegService(val);
-    if (!esMaison(regSalonId)) {
+    if (esPropio(regSalonId)) {
+      setRegCommission(100);
+    } else if (!esMaison(regSalonId)) {
       setRegCommission(comisionSugerida(regSalonId, val));
     }
   };
@@ -582,7 +564,9 @@ export default function App() {
   // Cambio de salón / servicio en el modal de edición
   const handleEditSalonChange = (val) => {
     setEditSalonId(val);
-    if (esMaison(val)) {
+    if (esPropio(val)) {
+      setEditCommission(100); // entidad propia: sin comisión
+    } else if (esMaison(val)) {
       setEditService('Maquillaje');
       setEditCommission(60);
     } else {
@@ -591,7 +575,9 @@ export default function App() {
   };
   const handleEditServiceChange = (val) => {
     setEditService(val);
-    if (!esMaison(editSalonId)) {
+    if (esPropio(editSalonId)) {
+      setEditCommission(100);
+    } else if (!esMaison(editSalonId)) {
       setEditCommission(comisionSugerida(editSalonId, val));
     }
   };
@@ -1032,6 +1018,16 @@ export default function App() {
   const vanidadesNetGain = salonNetGain('Vanidades');
   const maisonNetGain = salonNetGain('Maison Studio');
 
+  // Mi entidad propia (Rodriguez Makeup): ganancias independientes del mes, sin comisión.
+  const salonPropio = salones.find((s) => s.propio || /rodriguez/i.test(s.nombre || '')) || null;
+  const propioSalonIds = salones
+    .filter((s) => s.propio || /rodriguez/i.test(s.nombre || ''))
+    .map((s) => Number(s.id));
+  if (propioSalonIds.length === 0) propioSalonIds.push(3); // id estable de la entidad propia
+  const independienteNombre = (salonPropio && salonPropio.nombre) || 'Rodriguez Makeup';
+  const independienteServicios = monthlyServices.filter((s) => propioSalonIds.includes(Number(s.salon_id)));
+  const independienteNetGain = independienteServicios.reduce((total, s) => total + s.myGain, 0);
+
   const isViewingCurrentMonth = (now.getMonth() + 1 === selectedDashboardMonth) && (now.getFullYear() === selectedDashboardYear);
 
   // ==========================================
@@ -1068,6 +1064,25 @@ export default function App() {
     const start = (reportPage - 1) * itemsPerPage;
     return filteredServices.slice(start, start + itemsPerPage);
   }, [filteredServices, reportPage, itemsPerPage]);
+
+  // Paginación del inventario: 3x3 en escritorio => 9 productos por página.
+  // Reutiliza el mismo modelo de controles que la sección Informes.
+  const productsPerPage = 9;
+  const totalProductPages = Math.max(1, Math.ceil(products.length / productsPerPage));
+  const visibleProductPages = useMemo(() => {
+    if (totalProductPages <= 5) return Array.from({ length: totalProductPages }, (_, i) => i + 1);
+    const nearby = [productPage - 1, productPage, productPage + 1].filter((page) => page > 1 && page < totalProductPages);
+    return [1, ...(nearby[0] > 2 ? ['…'] : []), ...nearby, ...(nearby.at(-1) < totalProductPages - 1 ? ['…'] : []), totalProductPages];
+  }, [productPage, totalProductPages]);
+  const paginatedProducts = useMemo(() => {
+    const start = (productPage - 1) * productsPerPage;
+    return products.slice(start, start + productsPerPage);
+  }, [products, productPage]);
+
+  // Volver a la primera página al cambiar de búsqueda o de filtro de estado
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearch, productStatusFilter]);
 
   // Las métricas filtradas solo se muestran cuando el usuario aplica un filtro explícito
   const hasActiveFilters = Boolean(
@@ -1231,20 +1246,6 @@ export default function App() {
         <div className="fixed top-5 right-5 z-[60] animate-modal flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-xl border border-white/60 backdrop-blur-md bg-[#1e1e1c] text-white font-bold text-xs sm:text-sm max-w-[calc(100vw-2.5rem)]">
           <Sparkles className="w-5 h-5 text-[#ecc880] animate-pulse" />
           <span>{toastMsg.text}</span>
-        </div>
-      )}
-
-      {showInstallBanner && (
-        <div className="fixed left-3 right-3 bottom-20 md:bottom-5 md:left-auto md:right-5 z-[55] md:w-[360px] rounded-2xl border border-[#eec9a3] bg-white/95 backdrop-blur-md shadow-xl shadow-[#b64a83]/15 p-3.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#efd3e4] text-[#933a69] flex items-center justify-center shrink-0">
-            <Download className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold text-[#2a1a25]">Instala Rodríguez Make Up</p>
-            <p className="text-[11px] text-[#6b6764]">Ábrela como una aplicación desde tu pantalla de inicio.</p>
-          </div>
-          <button type="button" onClick={installApp} className="shrink-0 rounded-xl bg-[#b64a83] hover:bg-[#933a69] text-white px-3 py-2 text-xs font-extrabold">Instalar</button>
-          <button type="button" onClick={() => setShowInstallBanner(false)} aria-label="Cerrar aviso de instalación" className="self-start text-[#8c8884] hover:text-[#2a1a25]"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -1646,15 +1647,42 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div className="rounded-3xl p-5 sm:p-6 border border-[#f3b4d4] bg-gradient-to-br from-[#fff6fb] to-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
+              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {/* Botones de ganancia neta por salón: al pasar el cursor se iluminan y crecen (.gain-card) */}
+                <button
+                  type="button"
+                  onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setQuickRange('all'); setFilterSalon('1'); setActiveTab('informes'); }}
+                  title="Ver los servicios de Vanidades en Informes"
+                  className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#f3b4d4] bg-gradient-to-br from-[#fff6fb] to-[#efd3e4] shadow-lg shadow-[#b64a83]/10 cursor-pointer"
+                >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#933a69]">Ganancia Neta</span><Store className="w-5 h-5 text-[#b64a83]" /></div>
                   <p className="mt-4 text-sm font-semibold text-[#6b6764]">Salón Vanidades</p><p className="text-3xl font-black text-[#2a1a25]">S/ {vanidadesNetGain.toFixed(2)}</p>
-                </div>
-                <div className="rounded-3xl p-5 sm:p-6 border border-[#eec9a3] bg-gradient-to-br from-[#fffaf4] to-[#f6e9df] shadow-lg shadow-[#c89b6b]/15">
+                  <p className="mt-3 text-[11px] font-extrabold text-[#933a69]">Ver en Informes →</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setQuickRange('all'); setFilterSalon('2'); setActiveTab('informes'); }}
+                  title="Ver los servicios de Maison Studio en Informes"
+                  className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#eec9a3] bg-gradient-to-br from-[#fffaf4] to-[#f6e9df] shadow-lg shadow-[#c89b6b]/15 cursor-pointer"
+                >
                   <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#7d4e32]">Ganancia Neta</span><Store className="w-5 h-5 text-[#c89b6b]" /></div>
                   <p className="mt-4 text-sm font-semibold text-[#6b6764]">Maison Studio</p><p className="text-3xl font-black text-[#2a1a25]">S/ {maisonNetGain.toFixed(2)}</p>
-                </div>
+                  <p className="mt-3 text-[11px] font-extrabold text-[#7d4e32]">Ver en Informes →</p>
+                </button>
+                {/* Mis ganancias independientes (entidad propia Rodriguez Makeup, 100%) */}
+                <button
+                  type="button"
+                  onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setQuickRange('all'); setFilterSalon(String(salonPropio ? salonPropio.id : 3)); setActiveTab('informes'); }}
+                  title="Ver mis servicios propios en Informes"
+                  className="gain-card text-left rounded-3xl p-5 sm:p-6 border border-[#ec71a8]/45 bg-gradient-to-br from-[#fff6fb] via-[#fdf2f7] to-[#fdebdd] shadow-lg shadow-[#ec71a8]/20 cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs font-extrabold uppercase tracking-wide text-[#b64a83]">Ganancia Neta · Propia</span><Sparkles className="w-5 h-5 text-[#ec71a8]" /></div>
+                  <p className="mt-4 text-sm font-semibold text-[#6b6764]">{independienteNombre} · 100% mío, sin comisión</p>
+                  <p className="text-3xl font-black text-[#2a1a25]">S/ {independienteNetGain.toFixed(2)}</p>
+                  <p className="mt-3 text-[11px] font-extrabold text-[#b64a83]">
+                    {independienteServicios.length} {independienteServicios.length === 1 ? 'servicio propio' : 'servicios propios'} · Ver en Informes →
+                  </p>
+                </button>
               </div>
 
               {/* Desglose histórico retirado de la interfaz: el resumen prioriza ganancias por salón. */}
@@ -1764,9 +1792,11 @@ export default function App() {
                 </div>
               </div>
 
-                {/* DROPDOWNS + CONTADOR DE SERVICIOS EN LA MISMA FILA */}
-                <div className="flex flex-col gap-2.5">
+                {/* FILA DE FILTROS: a la izquierda la lista de rangos (histórico, hoy, esta semana...)
+                    ocupando la mitad de la página; a la derecha la lista de selección de salones. */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 lg:gap-6 items-start">
                   <div className="w-full">
+                    <label className="mb-1.5 block text-[11px] font-bold text-[#6b6764]">Rango de fechas</label>
                     <BrandSelect
                       value={quickRange}
                       onChange={handleQuickFilter}
@@ -1777,7 +1807,8 @@ export default function App() {
                       trailing={<span className="text-[11px] font-black bg-[#f6e3f0] text-[#b64a83] px-2.5 py-1 rounded-lg border border-[#efd3e4] whitespace-nowrap">{filteredServices.length} serv.</span>}
                     />
                   </div>
-                  <div className="w-full sm:max-w-xs">
+                  <div className="w-full">
+                    <label className="mb-1.5 block text-[11px] font-bold text-[#6b6764]">Salón / Estudio</label>
                     <SalonSelect
                       value={filterSalon}
                       onChange={(v) => setFilterSalon(v)}
@@ -1786,16 +1817,18 @@ export default function App() {
                       placeholder="Salón"
                     />
                   </div>
-                  {hasActiveFilters && (
+                </div>
+                {hasActiveFilters && (
+                  <div className="flex justify-end">
                     <button
                       onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); setQuickRange('all'); }}
-                      className="px-3 py-2 bg-white hover:bg-[#fce3ed] text-[#ec71a8] rounded-xl text-[11px] sm:text-xs font-extrabold flex items-center gap-1.5 cursor-pointer border border-[#f9cee3] transition-colors"
+                      className="px-3.5 py-2 bg-white hover:bg-[#fce3ed] text-[#ec71a8] rounded-xl text-[11px] sm:text-xs font-extrabold flex items-center gap-1.5 cursor-pointer border border-[#f9cee3] transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Limpiar
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* INPUTS COMPACTOS: DESDE / HASTA / SERVICIO */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 items-end">
@@ -1824,13 +1857,13 @@ export default function App() {
                   <div className="flex flex-col gap-1 col-span-2 lg:col-span-1">
                     <label className="text-[11px] font-bold text-[#6b6764]">Servicio</label>
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c8884] pointer-events-none" />
                       <input
                         type="text"
                         placeholder="Nombre del servicio"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-9 p-2.5 sm:p-3 border border-[#f9cee3] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                        className="w-full pl-11 pr-10 py-3 sm:pl-12 sm:pr-11 sm:py-3.5 border border-[#f9cee3] rounded-xl text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
                       />
                       {searchTerm && (
                         <button
@@ -2124,12 +2157,12 @@ export default function App() {
                 <p className="text-xs text-[#6b6764]">Gestiona tu inventario desde acciones simples.</p>
               </div>
               <div className="flex flex-col gap-3">
-                <button type="button" onClick={openProducto} className="w-full min-h-12 rounded-2xl border-0 bg-gradient-to-r from-[#d94691] to-[#9333ea] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-[0_0_22px_rgba(217,70,145,0.55)]"><Plus className="w-4 h-4" strokeWidth={3} />Registrar productos</button>
+                <button type="button" onClick={openProducto} className="glow-pulse-strong w-full min-h-12 rounded-2xl border-0 bg-gradient-to-r from-[#d94691] to-[#9333ea] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-[0_0_22px_rgba(217,70,145,0.55)]"><Plus className="w-4 h-4" strokeWidth={3} />Registrar productos</button>
                 <button type="button" onClick={openProductsList} className="w-full min-h-12 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] text-[#933a69] font-extrabold text-sm flex items-center justify-center gap-2"><Package className="w-4 h-4" />Ver mis productos <span className="rounded-full bg-[#efd3e4] px-2 py-0.5 text-[10px]">{products.length}</span></button>
               </div>
             </div>
             {/* Inventario integrado a la paleta clara de la aplicación. */}
-            <div className="hidden md:block rounded-3xl p-4 sm:p-8 bg-white border border-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
+            <div className="block rounded-3xl p-4 sm:p-8 bg-white border border-[#efd3e4] shadow-lg shadow-[#b64a83]/10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[#f6e3f0] border border-[#efd3e4] flex items-center justify-center">
@@ -2144,7 +2177,7 @@ export default function App() {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c8884] pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Buscar por nombre..."
@@ -2153,7 +2186,7 @@ export default function App() {
                         setProductSearch(e.target.value);
                         fetchProducts(e.target.value, productStatusFilter);
                       }}
-                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#efd3e4] text-sm font-medium bg-[#fff9fc] text-[#2a1a25] placeholder-[#8c8884] outline-none focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15 w-full sm:w-56"
+                      className="pl-11 pr-4 py-2.5 rounded-2xl border border-[#efd3e4] text-sm font-medium bg-[#fff9fc] text-[#2a1a25] placeholder-[#8c8884] outline-none focus:border-[#b64a83] focus:ring-2 focus:ring-[#b64a83]/15 w-full sm:w-56"
                     />
                   </div>
                   <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#fff9fc] border border-[#efd3e4]">
@@ -2184,7 +2217,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={openProducto}
-                    className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border-0 bg-gradient-to-r from-[#d94691] to-[#9333ea] text-white font-extrabold text-xs shadow-[0_0_20px_rgba(217,70,145,0.45)] hover:opacity-95 cursor-pointer whitespace-nowrap"
+                    className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border-0 bg-gradient-to-r from-[#d94691] to-[#9333ea] text-white font-extrabold text-xs shadow-[0_0_20px_rgba(217,70,145,0.45)] glow-pulse-strong hover:opacity-95 cursor-pointer whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
                     Registrar productos
@@ -2203,7 +2236,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {products.map((p) => {
+                  {paginatedProducts.map((p) => {
                     const isTerminated = p.status === 'terminado';
                     // Products terminados no participan en el semáforo de vencimiento
                     const state = isTerminated
@@ -2298,6 +2331,7 @@ export default function App() {
                             title="Editar producto"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
+                            <span className="md:hidden">Editar</span>
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(p.id)}
@@ -2305,11 +2339,62 @@ export default function App() {
                             title="Eliminar producto"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
+                            <span className="md:hidden">Eliminar</span>
                           </button>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* PAGINACIÓN DEL INVENTARIO (mismo modelo de botones que Informes) */}
+              {products.length > productsPerPage && (
+                <div className="flex flex-col items-center justify-center gap-3 mt-6 pt-5 border-t border-[#efd3e4]">
+                  <div className="text-xs text-[#8c8884] font-medium">
+                    Mostrando <span className="font-bold text-[#2a1a25]">{(productPage - 1) * productsPerPage + 1}</span> a <span className="font-bold text-[#2a1a25]">{Math.min(productPage * productsPerPage, products.length)}</span> de <span className="font-bold text-[#2a1a25]">{products.length}</span> productos
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-1.5 shadow-sm">
+                    <button onClick={() => setProductPage(1)} disabled={productPage === 1} className="hidden sm:block px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35 cursor-pointer">Inicio</button>
+                    {/* Página anterior */}
+                    <button
+                      onClick={() => setProductPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={productPage === 1}
+                      className={`px-3 sm:px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        productPage === 1
+                          ? 'opacity-40 cursor-not-allowed border-[#efd3e4] text-[#8c8884]'
+                          : 'bg-white hover:bg-[#f6e3f0] border-[#efd3e4] text-[#2a1a25] cursor-pointer shadow-xs hover:scale-105'
+                      }`}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Anterior</span>
+                    </button>
+
+                    {/* Números de página */}
+                    <div className="flex items-center gap-1.5">
+                      {visibleProductPages.map((pageNum, index) => pageNum === '…' ? (
+                        <span key={`product-ellipsis-${index}`} className="w-5 text-center text-xs font-bold text-[#8c8884]">…</span>
+                      ) : (
+                        <button key={pageNum} onClick={() => setProductPage(pageNum)} className={`w-8 h-8 rounded-xl font-black text-xs transition-all cursor-pointer ${productPage === pageNum ? 'bg-gradient-to-tr from-[#b64a83] to-[#933a69] text-white shadow-md shadow-[#b64a83]/25' : 'bg-white hover:bg-[#f6e3f0] text-[#6b6764] border border-[#efd3e4]'}`}>{pageNum}</button>
+                      ))}
+                    </div>
+
+                    {/* Página siguiente */}
+                    <button
+                      onClick={() => setProductPage((prev) => Math.min(prev + 1, totalProductPages))}
+                      disabled={productPage === totalProductPages}
+                      className={`px-3 sm:px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        productPage === totalProductPages
+                          ? 'opacity-40 cursor-not-allowed border-[#efd3e4] text-[#8c8884]'
+                          : 'bg-white hover:bg-[#f6e3f0] border-[#efd3e4] text-[#2a1a25] cursor-pointer shadow-xs hover:scale-105'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">Siguiente</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setProductPage(totalProductPages)} disabled={productPage === totalProductPages} className="hidden sm:block px-2.5 py-2 rounded-xl text-xs font-bold text-[#933a69] disabled:opacity-35 cursor-pointer">Último</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2326,27 +2411,29 @@ export default function App() {
           >
             <section
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-[#f9cee3] flex flex-col overflow-hidden animate-modal"
+              className="bg-white w-full max-w-2xl md:max-w-4xl xl:max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border border-[#f9cee3] flex flex-col overflow-hidden animate-modal"
             >
               {/* Cabecera fija; la X queda siempre en la esquina superior derecha. */}
-              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#fce3ed] px-4 py-3 sm:px-6">
+              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#fce3ed] px-4 py-3.5 sm:px-8 sm:py-5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] truncate">Registrar Servicio</h3>
-                    <p className="text-[10px] sm:text-xs text-[#8c8884] truncate">Comisión automática según salón y servicio</p>
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-extrabold text-[#1e1e1c] truncate">Registrar Servicio</h3>
+                    <p className="text-[11px] sm:text-sm text-[#8c8884] truncate">Comisión automática según salón y servicio</p>
                   </div>
                 </div>
                 <button type="button" onClick={closeRegistro} aria-label="Cerrar registro de servicio" className="p-2 rounded-xl bg-[#fce3ed] text-[#1e1e1c] hover:bg-[#f9cee3] cursor-pointer shrink-0"><X className="w-4 h-4" /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-7 flex flex-col gap-4 sm:gap-6">
+                  {/* En escritorio: Salón · Fecha · Servicio (ancho) en la primera fila,
+                      Precio · Comisión (ancho) en la segunda. Campos amplios y aireados. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 
                     {/* 0. SALÓN / ESTUDIO (obligatorio) */}
                     <div className="flex flex-col gap-2">
-                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                        <Store className="w-4 h-4 text-[#ec71a8]" />
+                      <label className="min-h-10 text-[11px] sm:text-[13px] font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Store className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Salón / Estudio
                       </label>
                       <SalonSelect
@@ -2358,23 +2445,23 @@ export default function App() {
 
                     {/* 1. FECHA */}
                     <div className="flex flex-col gap-2">
-                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                        <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
+                      <label className="min-h-10 text-[11px] sm:text-[13px] font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <CalendarIcon className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Fecha del Servicio
                       </label>
                       <input
                         type="date"
                         value={regDate}
                         onChange={(e) => setRegDate(e.target.value)}
-                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                         required
                       />
                     </div>
 
                     {/* 2. SERVICIO REALIZADO */}
-                    <div className="flex flex-col gap-2">
-                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                    <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-2">
+                      <label className="min-h-10 text-[11px] sm:text-[13px] font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Servicio Realizado
                       </label>
                       <input
@@ -2383,20 +2470,25 @@ export default function App() {
                         value={regService}
                         onChange={(e) => handleRegServiceChange(e.target.value)}
                         disabled={esMaison(regSalonId)}
-                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
+                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                         required
                       />
                       {esMaison(regSalonId) && (
-                        <span className="text-[10px] font-bold text-[#ec71a8]">
+                        <span className="text-[11px] font-bold text-[#ec71a8]">
                           Maison Studio solo permite Maquillaje
+                        </span>
+                      )}
+                      {esPropio(regSalonId) && (
+                        <span className="text-[11px] font-bold text-[#933a69]">
+                          Escribe libremente el servicio que hiciste por tu cuenta
                         </span>
                       )}
                     </div>
 
                     {/* 3. PRECIO COBRADO */}
-                    <div className="flex flex-col gap-2">
-                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                        <DollarSign className="w-4 h-4 text-[#ec71a8]" />
+                    <div className="flex flex-col gap-2 lg:col-span-2">
+                      <label className="min-h-10 text-[11px] sm:text-[13px] font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <DollarSign className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Precio Cobrado (S/)
                       </label>
                       <input
@@ -2406,15 +2498,15 @@ export default function App() {
                         placeholder="0.00"
                         value={regPrice}
                         onChange={(e) => setRegPrice(e.target.value)}
-                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                         required
                       />
                     </div>
 
                     {/* 4. COMISIÓN (autocompletada, ajustable) */}
-                    <div className="flex flex-col gap-2">
-                      <label className="min-h-9 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                        <Percent className="w-4 h-4 text-[#ec71a8]" />
+                    <div className="flex flex-col gap-2 lg:col-span-2">
+                      <label className="min-h-10 text-[11px] sm:text-[13px] font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Percent className="w-4 h-4 text-[#ec71a8] shrink-0" />
                         Comisión (% Mi Ganancia)
                       </label>
                       <input
@@ -2424,13 +2516,16 @@ export default function App() {
                         step="1"
                         value={regCommission}
                         onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
-                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        disabled={esPropio(regSalonId)}
+                        className="p-3.5 sm:p-4 border border-[#f9cee3] rounded-2xl text-sm sm:text-base font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                         required
                       />
-                      <span className="text-[10px] font-semibold text-[#8c8884]">
-                        {esMaison(regSalonId)
-                          ? 'Auto: Maison Studio · Maquillaje 60%'
-                          : 'Auto: Maquillaje 40% · otros servicios 30%'}
+                      <span className={`text-[11px] font-semibold ${esPropio(regSalonId) ? 'font-bold text-[#933a69]' : 'text-[#8c8884]'}`}>
+                        {esPropio(regSalonId)
+                          ? '🔒 Mi entidad propia: comisión bloqueada al 100% (todo es tuyo)'
+                          : esMaison(regSalonId)
+                            ? 'Auto: Maison Studio · Maquillaje 60%'
+                            : 'Auto: Maquillaje 40% · otros servicios 30%'}
                       </span>
                     </div>
 
@@ -2727,12 +2822,46 @@ export default function App() {
                 <button type="button" onClick={() => setShowProductsListModal(false)} aria-label="Cerrar mis productos" className="p-2 rounded-xl bg-[#f6e3f0] text-[#933a69]"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3">
-                {products.length === 0 ? <p className="py-10 text-center text-sm text-[#8c8884]">Aún no tienes productos registrados.</p> : products.map((p) => (
-                  <article key={p.id} className="rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-4">
-                    <div className="flex items-start justify-between gap-3"><h4 className="font-extrabold text-[#2a1a25]">{p.name}</h4><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${p.status === 'terminado' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>{p.status === 'terminado' ? 'Terminado' : 'Activo'}</span></div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6b6764]"><span>Cantidad: <b>{p.status === 'terminado' ? 0 : p.quantity}</b></span><span>Caduca: <b>{p.expiration_date}</b></span></div>
-                  </article>
-                ))}
+                {products.length === 0 ? <p className="py-10 text-center text-sm text-[#8c8884]">Aún no tienes productos registrados.</p> : products.map((p) => {
+                  const isTerminated = p.status === 'terminado';
+                  return (
+                    <article key={p.id} className={`rounded-2xl border border-[#efd3e4] bg-[#fff9fc] p-4 ${isTerminated ? 'opacity-70' : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className={`font-extrabold ${isTerminated ? 'text-[#8c8884] line-through' : 'text-[#2a1a25]'}`}>{p.name}</h4>
+                        <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-full ${isTerminated ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>{isTerminated ? 'Terminado' : 'Activo'}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6b6764]">
+                        <span>Cantidad: <b>{isTerminated ? 0 : p.quantity}</b></span>
+                        <span>Caduca: <b>{p.expiration_date}</b></span>
+                        <span>Apertura: <b>{p.start_date || 'Sin abrir'}</b></span>
+                        {p.price > 0 && <span>Precio: <b>S/ {Number(p.price).toFixed(2)}</b></span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#efd3e4]">
+                        {!isTerminated && !p.start_date && (
+                          <button onClick={() => handleOpenToday(p.id)} title="Marcar este producto como abierto hoy" className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#f6e3f0] border border-[#efd3e4] text-[#933a69] font-bold text-xs cursor-pointer">
+                            <CalendarCheck className="w-3.5 h-3.5" /> Abrir Hoy
+                          </button>
+                        )}
+                        {!isTerminated && (
+                          <button onClick={() => handleFinishProduct(p.id)} title="Marcar este producto como terminado/agotado" className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#efd3e4] text-[#933a69] font-bold text-xs cursor-pointer">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Terminado
+                          </button>
+                        )}
+                        {isTerminated && (
+                          <button onClick={() => handleReactivateProduct(p.id)} title="Volver a activar este producto" className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/40 text-emerald-700 font-bold text-xs cursor-pointer">
+                            <RotateCcw className="w-3.5 h-3.5" /> Reactivar
+                          </button>
+                        )}
+                        <button onClick={() => openEditProduct(p)} title="Editar producto" className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#fdebdd] border border-[#edd5b6] text-[#b8860b] font-bold text-xs cursor-pointer">
+                          <Edit3 className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => handleDeleteProduct(p.id)} title="Eliminar producto" className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-xs cursor-pointer">
+                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           </div>
@@ -2880,9 +3009,13 @@ export default function App() {
                     step="1"
                     value={editCommission}
                     onChange={(e) => setEditCommission(Number(e.target.value) || 0)}
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    disabled={esPropio(editSalonId)}
+                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8] disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                     required
                   />
+                  <span className={`text-[10px] font-semibold ${esPropio(editSalonId) ? 'font-bold text-[#933a69]' : 'text-[#8c8884]'}`}>
+                    {esPropio(editSalonId) ? '🔒 Entidad propia: 100% para mí (sin comisión)' : 'Comisión del servicio'}
+                  </span>
                 </div>
               </div>
 

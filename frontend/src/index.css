@@ -156,3 +156,56 @@
     box-shadow: 0 0 16px rgba(236, 113, 168, 0.7), 0 4px 16px rgba(217, 70, 145, 0.4);
   }
 }
+
+
+/* ============================================================
+   Resplandor pulsante intenso — botón "Registrar productos"
+   Palpita irradiando luz (halo rosa + violeta) sin mover el layout.
+   ============================================================ */
+@keyframes strongPulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(217, 70, 145, 0.55), 0 0 12px rgba(217, 70, 145, 0.55), 0 0 22px rgba(147, 51, 234, 0.30);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(217, 70, 145, 0.10), 0 0 30px rgba(217, 70, 145, 0.95), 0 0 55px rgba(147, 51, 234, 0.60);
+    filter: brightness(1.14);
+  }
+}
+
+.glow-pulse-strong {
+  animation: strongPulseGlow 1.9s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-pulse-strong {
+    animation: none;
+    box-shadow: 0 0 22px rgba(217, 70, 145, 0.80), 0 0 44px rgba(147, 51, 234, 0.45);
+  }
+}
+
+/* ============================================================
+   Tarjetas/botones de ganancia neta por salón (Resumen):
+   al pasar el cursor se iluminan y crecen un poco.
+   El transform solo con puntero real para no dejar :hover pegado en tactil.
+   ============================================================ */
+.gain-card {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, filter 0.3s ease, border-color 0.3s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gain-card:hover {
+    transform: scale(1.035);
+    filter: brightness(1.07) saturate(1.06);
+    box-shadow: 0 0 0 1px rgba(236, 113, 168, 0.40), 0 18px 38px -12px rgba(182, 74, 131, 0.45), 0 0 28px rgba(236, 113, 168, 0.40);
+  }
+}
+
+.gain-card:active {
+  transform: scale(0.99);
+}
+
+.gain-card:focus-visible {
+  outline: 3px solid rgba(236, 113, 168, 0.55);
+  outline-offset: 2px;
+}

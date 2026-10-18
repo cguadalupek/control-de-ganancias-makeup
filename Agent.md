@@ -6,7 +6,7 @@ Sistema de registro de servicios y control de ganancias para **GUADALUPE MAKE UP
 ## Stack
 
 - **Frontend:** React 18 + Vite 5 + Tailwind CSS 3 + lucide-react. SPA en un solo archivo
-  `frontend/src/App.jsx` (~3.070 líneas) más `frontend/src/index.css` (~160 líneas de tokens y animaciones).
+  `frontend/src/App.jsx` (~3.200 líneas) más `frontend/src/index.css` (~210 líneas de tokens y animaciones).
 - **Backend:** FastAPI + SQLite (`backend/main.py`, ~790 líneas). Base de datos en `./data/salon.db`
   (volumen Docker, datos reales de producción).
 - **Despliegue:** Docker Compose. `frontend` (nginx, puerto 80) sirve el build estático y proxya `/api/` →
@@ -20,16 +20,22 @@ Sistema de registro de servicios y control de ganancias para **GUADALUPE MAKE UP
 
 ## Reglas de negocio (NO cambiar sin pedirlo)
 
-- **Salones:** `1 = Vanidades`, `2 = Maison Studio` (IDs estables, precargados en la DB).
+- **Salones:** `1 = Vanidades`, `2 = Maison Studio`, `3 = Rodriguez Makeup` (IDs estables, precargados en la DB).
 - **Comisiones:** Vanidades → Maquillaje 40 %, otros servicios 30 %. Maison Studio → solo Maquillaje 60 %
   (el campo servicio se fuerza a "Maquillaje" y el porcentaje a 60, también en los servicios extra).
+- **Entidad propia (`salones.propio = 1`, hoy `3 = Rodriguez Makeup`):** el servicio es 100 % de la
+  maquilladora, **sin comisión**. Al elegirla en el registro el campo *Comisión* queda **bloqueado en 100 %**
+  (y el de edición igual). El backend lo fuerza en `POST /registro`, `POST /registro-lote` y `PUT /registro/{id}`
+  (`salon_es_propio()`), así que la ganancia del salón siempre es 0.00 aunque el cliente mande otro porcentaje.
+  La fila del salón propio se crea/marca de forma idempotente en `init_db()`.
+- **Criterio en la UI:** `esPropio(id)` en `App.jsx` (flag `propio` o nombre con "rodriguez").
 - **Meta mensual** por defecto: S/ 480.00 (`DEFAULT_GOAL` en App.jsx y fallback `480.0` en main.py).
 - El panel de Resumen se reinicia a 0.00 al cambiar de mes (filtra por `mes`/`anio`).
 - La **semana** de cada servicio la calcula el backend a partir de la fecha.
 
 ## API (prefijo `/api` vía nginx)
 
-- `GET /salones` · `GET /catalogo` · `GET /servicios?desde&hasta&salon_id`
+- `GET /salones` (devuelve `{id, nombre, propio}`) · `GET /catalogo` · `GET /servicios?desde&hasta&salon_id`
   (devuelve un objeto `{cantidad, servicios:[...], total_personal, total_salon, total_facturado}`, **no** una lista)
 - `POST /registro` · `POST /registro-lote` · `PUT /registro/{id}` · `DELETE /registro/{id}`
 - `GET /resumen/{anio}/{mes}`
@@ -51,13 +57,21 @@ El porcentaje se normaliza (`40` o `0.40` → 40 %). Ganancia personal = precio 
   cierre con X, `Escape` o toque fuera, scroll bloqueado en `html` y `body`).
 - **Resumen:** 3 métricas (Mi Ganancia Neta · Total Facturado · Meta) en
   `grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-3`; "Rendimiento por Semanas" **solo desktop**
-  (`hidden lg:flex`, `lg:col-span-3` → ancho completo) y dos tarjetas de ganancia neta por salón.
-- **Informes:** filtros (`BrandSelect` de rango + `SalonSelect` + `BrandDateField` Desde/Hasta + búsqueda),
-  tarjetas de totales solo con `hasActiveFilters`, historial en **tabla `hidden md:block`**
-  (`min-w-[750px]` dentro de `overflow-x-auto`) y en **tarjetas** en móvil (`md:hidden`, línea ~2016),
+  (`hidden lg:flex`, `lg:col-span-3` → ancho completo) y **tres botones `.gain-card`** de ganancia neta:
+  Vanidades, Maison Studio y **"Ganancia Neta · Propia"** (entidad propia, 100 %). Los tres se iluminan y
+  crecen al pasar el cursor y, al pulsarlos, abren Informes ya filtrado por ese salón.
+- **Informes:** filtros en **dos columnas** (`lg:grid-cols-2`): a la izquierda la lista de rangos
+  (histórico, hoy, esta semana…) y a la derecha la lista de salones (incluye la entidad propia); el botón
+  *Limpiar* va alineado a la derecha. Debajo, `BrandDateField` Desde/Hasta + búsqueda por servicio, tarjetas
+  de totales solo con `hasActiveFilters`, historial en **tabla `hidden md:block`**
+  (`min-w-[750px]` dentro de `overflow-x-auto`) y en **tarjetas** en móvil (`md:hidden`),
   paginación de 5 registros con Inicio/Último.
-- **Productos:** en móvil una tarjeta de acciones con "Registrar productos" / "Ver mis productos";
-  alta y listado en modales; tema negro & dorado en el listado.
+- **Productos:** el inventario ya se ve también en móvil (`block`), en **rejilla 3×3 en escritorio**
+  (`md:grid-cols-2 xl:grid-cols-3`) con **9 productos por página** y controles de paginación copiados de
+  Informes (`productPage`/`productsPerPage`). Cada tarjeta lleva Abrir Hoy (si no está abierto) /
+  Terminado / Reactivar / Editar / Eliminar, con etiqueta de texto también en móvil. Arriba, en móvil, una
+  tarjeta de acciones con "Registrar productos" (pulsante) y "Ver mis productos" (modal, con los mismos
+  botones en cada resultado). Tema negro & dorado en el listado.
 
 ## Componentes reutilizables (`App.jsx`)
 
@@ -123,15 +137,37 @@ cd /opt/salon-app && git add -A && git commit -m "tipo(scope): mensaje" && git p
 - **Tipografías:** Outfit (UI y titulares), Playfair Display (`font-serif-luxury`), Great Vibes
   (`font-brand-script`).
 - **Clases reutilizables (`index.css`):** `card-luxury`, `bg-gradient-rose`, `bg-gradient-gold`,
-  `text-gradient-gold`, `animate-modal`, `glow-gold`, `glow-rose` (resplandor pulsante del botón Registrar,
-  con variante para `prefers-reduced-motion`).
+  `text-gradient-gold`, `animate-modal`, `glow-gold`, `glow-rose` (resplandor pulsante del botón Registrar
+  de la barra móvil), **`glow-pulse-strong`** (palpitación intensa de "Registrar productos") y
+  **`gain-card`** (hover de los botones de ganancia neta: `scale(1.035)` + brillo, solo en
+  `@media (hover: hover) and (pointer: fine)`); todas con variante para `prefers-reduced-motion`.
+- **Ventana "Registrar Servicio":** en escritorio `max-w-2xl md:max-w-4xl xl:max-w-5xl`, rejilla de campos
+  `sm:grid-cols-2 lg:grid-cols-4` (Salón · Fecha · Servicio ancho / Precio ancho · Comisión ancho) con
+  labels e inputs algo más grandes.
+- **Sin aviso de instalación PWA:** se eliminó el banner "Instala Rodríguez Make Up" junto con su estado
+  (`deferredInstallPrompt`, `showInstallBanner`), el `beforeinstallprompt` y `installApp`. El `sw.js` sigue
+  existiendo por si la app ya está instalada.
 - **Prioridad de UX:** la app se usa sobre todo en **móvil** (pulgar, botones ≥44 px, tarjetas en vez de
   tablas con scroll) y en **desktop** (sidebar). Toda edición debe verse bien en ambos.
 
 ## Verificación visual
 
 Playwright está instalado en el **LXC 103** (`/root/shot.py`, `/root/verify*.py`) y desde allí se puede
-apuntar al host nuevo:
+apuntar al host nuevo. **Si el 103 no responde** (su SSH no está accesible desde el 113/Windows), la
+alternativa verificada es **Chrome headless + CDP desde Windows** con Node (no hace falta instalar nada):
+
+```bash
+# 1) chrome --headless=new --remote-debugging-port=9333 --user-data-dir=<tmp> about:blank
+# 2) Node >= 21 (WebSocket global): fetch /json/list -> ws -> Page.navigate + Runtime.evaluate
+#    (returnByValue) para medir geometría real y estilo calculado; Emulation.setDeviceMetricsOverride
+#    para 1440x900 y 390x844.
+cd /tmp && node verify.js   # imprime un JSON con todas las comprobaciones
+```
+
+Comprobaciones útiles: ancho de la ventana modal, `gridTemplateColumns` (3×3 del inventario), mitad/mitad
+de los filtros de Informes, `paddingLeft` + hueco icono/texto, `animationName`/`iterationCount` del botón
+pulsante, reglas `.gain-card:hover` en el CSSOM (recorrer también los `@media`) y
+`documentElement.scrollWidth == window.innerWidth` en 390 px (sin desborde horizontal).
 
 ```bash
 plink -pw PASSWORD -hostkey "SHA256:RhIW5IjWnstWLmh53Qrg51C3yg7EwKzcdE49RkI43HE" root@192.168.1.103 \
@@ -144,6 +180,11 @@ viewport y que la consola quede sin errores.
 
 ## Pitfalls conocidos
 
+- **Tailwind: una variante pisa la utilidad base del mismo grupo.** `sm:p-3.5` se emite después de `pl-9`,
+  así que en escritorio el `padding-left` acababa en 14 px y el texto del campo "Nombre del servicio"
+  chocaba con el icono de la lupa. Regla: en inputs con icono superpuesto, el padding lateral va **con la
+  misma variante** (`pl-11 pr-10 py-3 sm:pl-12 sm:pr-11 sm:py-3.5`), nunca mezclando `p-*` con `pl-*`.
+  Comprobarlo midiendo `computedStyle.paddingLeft` y el hueco real (`input.left + paddingLeft - icon.right > 8`).
 - **`frontend/src/App.jsx` usa finales de línea CRCRLF (`\r\r\n`).** Las herramientas `patch`/`write_file`
   los convierten en `\r\n\r\n` e insertan una línea en blanco tras **cada** línea (el archivo pasa de 3.068 a
   ~6.100 líneas sin dar ningún error). Editar con un script de Python: `raw.decode('utf-8').split('\r\r\n')`,
