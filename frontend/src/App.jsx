@@ -109,7 +109,7 @@ function BrandLogo({ compact = false }) {
 
 // Dropdown de marca reutilizable: mismo estilo del selector de Salón
 // (botón con chevron + panel animado). Se usa en Salón, Rango de fechas y Caducidad.
-function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona...', icon: Icon = Store, buttonClass = '', panelClass = '' }) {
+function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona...', icon: Icon = Store, buttonClass = '', panelClass = '', dark = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -130,19 +130,21 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center justify-between gap-2 p-3 sm:p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
           open
-            ? 'border-[#ec71a8] ring-3 ring-[#ec71a8]/15 bg-white'
-            : 'border-[#f9cee3] bg-[#faf5f8] hover:border-[#ec71a8]/50'
+            ? (dark ? 'border-[#ecc880] ring-3 ring-[#ecc880]/20 bg-[#1e1e1c]' : 'border-[#ec71a8] ring-3 ring-[#ec71a8]/15 bg-white')
+            : (dark ? 'border-[#ecc880]/30 bg-[#1e1e1c] hover:border-[#ecc880]/70' : 'border-[#f9cee3] bg-[#faf5f8] hover:border-[#ec71a8]/50')
         } ${buttonClass}`}
       >
-        <span className={`flex items-center gap-2 min-w-0 ${selected ? 'text-[#1e1e1c]' : 'text-[#8c8884]'}`}>
-          <Icon className="w-4 h-4 text-[#ec71a8] shrink-0" />
+        <span className={`flex items-center gap-2 min-w-0 ${selected ? (dark ? 'text-white' : 'text-[#1e1e1c]') : 'text-[#8c8884]'}`}>
+          <Icon className={`w-4 h-4 shrink-0 ${dark ? 'text-[#ecc880]' : 'text-[#ec71a8]'}`} />
           <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
-        <ChevronDown className={`w-4 h-4 text-[#ec71a8] transition-transform duration-200 shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 transition-transform duration-200 shrink-0 ${dark ? 'text-[#ecc880]' : 'text-[#ec71a8]'} ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className={`absolute z-50 mt-2 w-full rounded-2xl bg-white border border-[#f9cee3] shadow-xl shadow-[#ec71a8]/10 overflow-hidden animate-modal ${panelClass}`}>
+        <div className={`absolute z-50 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${
+          dark ? 'bg-[#151513] border-[#ecc880]/30 shadow-black/50' : 'bg-white border-[#f9cee3] shadow-[#ec71a8]/10'
+        } ${panelClass}`}>
           {options.map((o) => {
             const active = String(o.value) === String(value);
             return (
@@ -150,20 +152,30 @@ function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona.
                 key={o.value}
                 type="button"
                 onClick={() => { onChange(String(o.value)); setOpen(false); }}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors cursor-pointer border-b border-[#fce3ed] last:border-b-0 ${
-                  active ? 'bg-[#fce3ed]' : 'bg-white hover:bg-[#fff5f8]'
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors cursor-pointer border-b last:border-b-0 ${
+                  dark ? 'border-[#ecc880]/15' : 'border-[#fce3ed]'
+                } ${
+                  active
+                    ? (dark ? 'bg-[#ecc880]/15' : 'bg-[#fce3ed]')
+                    : (dark ? 'bg-[#151513] hover:bg-[#232320]' : 'bg-white hover:bg-[#fff5f8]')
                 }`}
               >
                 <span className="flex items-center gap-2.5 min-w-0">
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-[#ec71a8] text-white' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    dark
+                      ? (active ? 'bg-[#ecc880] text-[#151513]' : 'bg-[#ecc880]/15 text-[#ecc880]')
+                      : (active ? 'bg-[#ec71a8] text-white' : 'bg-[#fce3ed] text-[#ec71a8]')
+                  }`}>
                     <Icon className="w-4 h-4" />
                   </span>
                   <span className="flex flex-col min-w-0">
-                    <span className={`text-sm font-bold ${active ? 'text-[#ec71a8]' : 'text-[#1e1e1c]'}`}>{o.label}</span>
+                    <span className={`text-sm font-bold ${
+                      dark ? (active ? 'text-[#ecc880]' : 'text-white') : (active ? 'text-[#ec71a8]' : 'text-[#1e1e1c]')
+                    }`}>{o.label}</span>
                     {o.desc && <span className="text-[10px] font-semibold text-[#8c8884]">{o.desc}</span>}
                   </span>
                 </span>
-                {active && <Check className="w-4 h-4 text-[#ec71a8] shrink-0" />}
+                {active && <Check className={`w-4 h-4 shrink-0 ${dark ? 'text-[#ecc880]' : 'text-[#ec71a8]'}`} />}
               </button>
             );
           })}
@@ -192,8 +204,88 @@ function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAl
   return <BrandSelect value={value} onChange={onChange} options={options} placeholder={placeholder} icon={Store} />;
 }
 
+// FAB arrastrable: posición persistida en localStorage, distingue toque de arrastre
+function useDraggableFab({ storageKey, size = 56, defaultRight = 16, defaultBottom = 68, onTap }) {
+  const clamp = (p) => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
+    return {
+      x: Math.min(Math.max(8, p.x), Math.max(8, vw - size - 8)),
+      y: Math.min(Math.max(8, p.y), Math.max(8, vh - size - 8)),
+    };
+  };
+  const defaultPos = () => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
+    return clamp({ x: vw - size - defaultRight, y: vh - size - defaultBottom });
+  };
+  const readInitial = () => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (typeof saved.x === 'number' && typeof saved.y === 'number') return clamp(saved);
+      }
+    } catch (err) { /* almacenamiento no disponible */ }
+    return defaultPos();
+  };
+
+  const [pos, setPos] = useState(readInitial);
+  const posRef = useRef(pos);
+  const tapRef = useRef(onTap);
+  const drag = useRef({ active: false, moved: false, dx: 0, dy: 0, sx: 0, sy: 0 });
+
+  useEffect(() => { tapRef.current = onTap; });
+
+  const apply = (next) => { posRef.current = next; setPos(next); };
+
+  useEffect(() => {
+    const onResize = () => apply(clamp(posRef.current));
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlers = {
+    onPointerDown: (e) => {
+      drag.current = {
+        active: true, moved: false,
+        dx: e.clientX - posRef.current.x, dy: e.clientY - posRef.current.y,
+        sx: e.clientX, sy: e.clientY,
+      };
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    },
+    onPointerMove: (e) => {
+      const d = drag.current;
+      if (!d.active) return;
+      if (!d.moved && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) d.moved = true;
+      if (!d.moved) return;
+      apply(clamp({ x: e.clientX - d.dx, y: e.clientY - d.dy }));
+    },
+    onPointerUp: (e) => {
+      const d = drag.current;
+      if (!d.active) return;
+      d.active = false;
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      if (d.moved) {
+        try { window.localStorage.setItem(storageKey, JSON.stringify(posRef.current)); } catch (err) { /* noop */ }
+      } else if (typeof tapRef.current === 'function') {
+        tapRef.current();
+      }
+    },
+    onPointerCancel: () => { drag.current.active = false; },
+  };
+
+  return { pos, style: { left: `${pos.x}px`, top: `${pos.y}px`, touchAction: 'none' }, handlers };
+}
+
 export default function App() {
-  // Navegación ('resumen' | 'nuevo_servicio' | 'productos' | 'informes')
+  // Navegación por pestañas ('resumen' | 'productos' | 'informes')
+  // El registro de servicio y el de producto se abren como ventanas modales superpuestas
   const [activeTab, setActiveTab] = useState('resumen');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -245,6 +337,7 @@ export default function App() {
   const [regPrice, setRegPrice] = useState('');
   const [regCommission, setRegCommission] = useState(40); // % autocompletado (ajustable)
   const [extraItems, setExtraItems] = useState([]); // servicios extra de la misma clienta (misma visita)
+  const [showRegistroModal, setShowRegistroModal] = useState(false); // modal superpuesto de registro de servicio
 
   // Salones / estudios disponibles
   const [salones, setSalones] = useState([]);
@@ -266,8 +359,7 @@ export default function App() {
   const [productStatusFilter, setProductStatusFilter] = useState('activo'); // 'activo' | 'terminado' | 'todos'
   const [productLoading, setProductLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [showProductForm, setShowProductForm] = useState(false); // en móvil el formulario se abre con el FAB
-  const productFormRef = useRef(null);
+  const [showProductModal, setShowProductModal] = useState(false); // modal superpuesto de registro de producto
 
   // Formulario de nuevo producto
   const todayYMDProduct = todayYMD; // reutilizamos el todayYMD ya definido arriba
@@ -540,6 +632,7 @@ export default function App() {
     setRegService('');
     setRegPrice('');
     setExtraItems([]);
+    setShowRegistroModal(false);
     showToast(
       items.length > 1 ? `¡${items.length} servicios registrados juntos!` : '¡Servicio registrado con éxito!',
       'success'
@@ -671,6 +764,7 @@ export default function App() {
         throw new Error(err.detail || 'Error al registrar producto');
       }
       showToast('¡Producto registrado!', 'success');
+      setShowProductModal(false);
       setProdName('');
       setProdPrice('');
       setProdStartDate('');
@@ -828,12 +922,48 @@ export default function App() {
     setSelectedDashboardMonth(cur.getMonth() + 1);
   };
 
-  // Abrir el formulario de registro de servicio desde cualquier pantalla (FAB / barra inferior)
+  // Modales superpuestos: registro de servicio y registro de producto
   const openRegistro = () => {
-    setActiveTab('nuevo_servicio');
+    setShowRegistroModal(true);
     setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const closeRegistro = () => setShowRegistroModal(false);
+
+  const openProducto = () => {
+    setShowProductModal(true);
+    setMobileMenuOpen(false);
+  };
+  const closeProducto = () => setShowProductModal(false);
+
+  // FABs arrastrables (se recuerda dónde los deja la usuaria)
+  const serviceFab = useDraggableFab({ storageKey: 'salon_fab_servicio', onTap: () => setShowRegistroModal(true) });
+  const productFab = useDraggableFab({ storageKey: 'salon_fab_producto', onTap: () => setShowProductModal(true) });
+
+  const anyModalOpen = showRegistroModal || showProductModal;
+
+  // Con una ventana modal abierta el fondo no se desplaza: el scroll ocurre solo dentro del modal.
+  // Se bloquean html y body (en algunos navegadores el overflow de body no propaga al viewport).
+  useEffect(() => {
+    if (!anyModalOpen) return undefined;
+    const html = document.documentElement;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = html.style.overflow;
+    document.body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBody;
+      html.style.overflow = prevHtml;
+    };
+  }, [anyModalOpen]);
+
+  useEffect(() => {
+    if (!anyModalOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') { setShowRegistroModal(false); setShowProductModal(false); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [anyModalOpen]);
 
   // ==========================================
   // DATOS FILTRADOS PARA EL DASHBOARD MENSUAL
@@ -1076,7 +1206,7 @@ export default function App() {
       
       {/* TOAST FLOTANTE DE NOTIFICACIONES */}
       {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 animate-modal flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border border-white/60 backdrop-blur-md bg-[#1e1e1c] text-white font-bold text-sm">
+        <div className="fixed top-5 right-5 z-[60] animate-modal flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-xl border border-white/60 backdrop-blur-md bg-[#1e1e1c] text-white font-bold text-xs sm:text-sm max-w-[calc(100vw-2.5rem)]">
           <Sparkles className="w-5 h-5 text-[#ecc880] animate-pulse" />
           <span>{toastMsg.text}</span>
         </div>
@@ -1131,21 +1261,21 @@ export default function App() {
               </div>
             </button>
 
-            {/* 2. NUEVO REGISTRO */}
+            {/* 2. NUEVO REGISTRO (abre la ventana modal superpuesta) */}
             <button
-              onClick={() => { setActiveTab('nuevo_servicio'); setMobileMenuOpen(false); }}
+              onClick={openRegistro}
               className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
-                activeTab === 'nuevo_servicio'
+                showRegistroModal
                   ? 'bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white shadow-lg shadow-[#ec71a8]/25 translate-x-1'
                   : 'text-[#4a4744] hover:bg-[#fce3ed]/60 hover:text-[#1e1e1c]'
               }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'nuevo_servicio' ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${showRegistroModal ? 'bg-white/20' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
                 <PlusCircle className="w-4 h-4" />
               </div>
               <div className="text-left flex-1">
                 <span className="block font-extrabold">Registrar Servicio</span>
-                <span className={`text-[11px] block font-medium ${activeTab === 'nuevo_servicio' ? 'text-pink-100' : 'text-[#8c8884]'}`}>
+                <span className={`text-[11px] block font-medium ${showRegistroModal ? 'text-pink-100' : 'text-[#8c8884]'}`}>
                   Ingreso rápido & cálculo
                 </span>
               </div>
@@ -1254,7 +1384,6 @@ export default function App() {
           </div>
         ) : (
           <span className="text-xs font-extrabold uppercase tracking-widest text-[#ec71a8] text-right">
-            {activeTab === 'nuevo_servicio' && 'Registrar Servicio'}
             {activeTab === 'productos' && 'Mis Productos'}
             {activeTab === 'informes' && 'Informes'}
           </span>
@@ -1268,7 +1397,6 @@ export default function App() {
         <header className="hidden md:flex items-center justify-between gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-2xl px-5 py-3.5 shadow-sm">
           <h2 className="text-base lg:text-lg font-extrabold text-[#1e1e1c] tracking-tight">
             {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
-            {activeTab === 'nuevo_servicio' && 'Nuevo Registro de Servicio'}
             {activeTab === 'productos' && 'Registro y Control de Productos'}
             {activeTab === 'informes' && 'Historial, Edición e Informes'}
           </h2>
@@ -1315,11 +1443,6 @@ export default function App() {
               {activeTab === 'productos' && (
                 <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
                   {products.length} {products.length === 1 ? 'producto' : 'productos'}
-                </span>
-              )}
-              {activeTab === 'nuevo_servicio' && (
-                <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
-                  {services.length} {services.length === 1 ? 'servicio registrado' : 'servicios registrados'}
                 </span>
               )}
             </div>
@@ -1555,429 +1678,7 @@ export default function App() {
 
             </div>
 
-            {/* TABLA DE ÚLTIMO SERVICIO REGISTRADO DEL MES (SOLO 1 REGISTRO, EL MÁS ACTUAL) */}
-            <div className="card-luxury rounded-3xl p-4 sm:p-7">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
-                      Último Servicio de {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
-                    </h3>
-                    <span className="text-[11px] font-black uppercase bg-[#fce3ed] text-[#ec71a8] px-2.5 py-0.5 rounded-full border border-[#f9cee3]">
-                      Más reciente
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#8c8884] mt-0.5">
-                    Mostrando el servicio más reciente del mes. Para ver el historial completo, accede a Informes.
-                  </p>
-                </div>
 
-                <button
-                  onClick={() => setActiveTab('informes')}
-                  className="px-4 py-2 rounded-xl bg-[#fce3ed] text-[#ec71a8] hover:bg-[#f9cee3] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  Ver todos los informes <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#fce3ed]">
-                <table className="w-full text-left border-collapse min-w-[650px]">
-                  <thead>
-                    <tr className="bg-[#1e1e1c] text-white text-[11px] font-black uppercase tracking-wider">
-                      <th className="p-3.5">Fecha</th>
-                      <th className="p-3.5">Semana</th>
-                      <th className="p-3.5">Servicio Realizado</th>
-                      <th className="p-3.5">Salón</th>
-                      <th className="p-3.5">Cobrado (S/)</th>
-                      <th className="p-3.5">Comisión</th>
-                      <th className="p-3.5">Mi Ganancia</th>
-                      <th className="p-3.5">Ganancia Salón</th>
-                      <th className="p-3.5 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#fce3ed] text-sm bg-white">
-                    {monthlyServices.length > 0 ? (
-                      monthlyServices.slice(0, 1).map((item) => (
-                        <tr key={item.id} className="hover:bg-[#fff5f8] transition-colors">
-                          <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
-                          <td className="p-3.5 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
-                          <td className="p-3.5 whitespace-nowrap font-extrabold text-[#1e1e1c]">{item.service}</td>
-                          <td className="p-3.5 whitespace-nowrap">
-                            <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
-                              {salonNombre(item.salon_id)}
-                            </span>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</td>
-                          <td className="p-3.5 whitespace-nowrap">
-                            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${
-                              item.commission === 40
-                                ? 'bg-[#fce3ed] text-[#ec71a8] border-[#f9cee3]'
-                                : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
-                            }`}>
-                              {item.commission}%
-                            </span>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap font-black text-[#ec71a8] text-base">
-                            S/ {item.myGain.toFixed(2)}
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap font-semibold text-[#6b6764]">
-                            S/ {item.salongain.toFixed(2)}
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {/* BOTÓN EDITAR */}
-                              <button
-                                onClick={() => handleOpenEdit(item)}
-                                className="p-2 bg-[#fdebdd]/70 hover:bg-[#fdebdd] text-[#b8860b] rounded-xl border border-[#edd5b6] transition-all cursor-pointer shadow-xs hover:scale-105"
-                                title="Editar servicio"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              {/* BOTÓN ELIMINAR */}
-                              <button
-                                onClick={() => handleDeleteService(item.id)}
-                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 transition-all cursor-pointer shadow-xs hover:scale-105"
-                                title="Eliminar servicio"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="9" className="p-10 text-center text-[#8c8884]">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <Sparkles className="w-8 h-8 text-[#ec71a8]/40" />
-                            <span className="font-extrabold text-[#1e1e1c]">
-                              No hay servicios registrados en {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}.
-                            </span>
-                            <p className="text-xs text-[#8c8884]">
-                              El panel inicia en 0.00 al comenzar cada nuevo mes.
-                            </p>
-                            <p className="text-xs font-bold text-[#ec71a8]">
-                              Usa el botón + de la barra inferior para registrar un servicio.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* TARJETAS MÓVIL: ÚLTIMO SERVICIO */}
-              <div className="md:hidden flex flex-col gap-3">
-                {monthlyServices.length > 0 ? (
-                  monthlyServices.slice(0, 1).map((item) => (
-                    <div key={item.id} className="rounded-2xl bg-white border border-[#fce3ed] p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-xs font-bold text-[#6b6764]">{item.date} · {item.week}</span>
-                        <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
-                          {salonNombre(item.salon_id)}
-                        </span>
-                      </div>
-                      <div className="font-extrabold text-[#1e1e1c] mb-3">{item.service}</div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-[#8c8884] font-medium">Cobrado</span>
-                        <span className="font-bold text-[#1e1e1c]">S/ {item.price.toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-[#8c8884] font-medium">Comisión</span>
-                        <span className="font-black text-[#ec71a8]">{item.commission}%</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#8c8884] font-medium">Mi Ganancia</span>
-                        <span className="font-black text-[#ec71a8] text-base">S/ {item.myGain.toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-[#fce3ed]">
-                        <span className="text-[#8c8884] font-medium">Ganancia Salón</span>
-                        <span className="font-semibold text-[#6b6764]">S/ {item.salongain.toFixed(2)}</span>
-                      </div>
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-[#fce3ed]">
-                        <button onClick={() => handleOpenEdit(item)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#fdebdd] text-[#b8860b] border border-[#edd5b6] font-bold text-xs">
-                          <Pencil className="w-3.5 h-3.5" /> Editar
-                        </button>
-                        <button onClick={() => handleDeleteService(item.id)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 font-bold text-xs">
-                          <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl bg-white border border-[#fce3ed] p-6 text-center">
-                    <Sparkles className="w-8 h-8 text-[#ec71a8]/40 mx-auto mb-2" />
-                    <span className="font-extrabold text-[#1e1e1c] text-sm">No hay servicios registrados en {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}.</span>
-                    <p className="text-xs font-bold text-[#ec71a8] mt-1">Usa el botón + de la barra inferior para registrar un servicio.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* ENLACE AL HISTORIAL COMPLETO SI HAY MÁS DE UN SERVICIO */}
-              {monthlyServices.length > 1 && (
-                <div className="mt-4 pt-3 border-t border-[#fce3ed] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#6b6764]">
-                  <span>Hay <b>{monthlyServices.length} servicios</b> registrados en este mes.</span>
-                  <button
-                    onClick={() => setActiveTab('informes')}
-                    className="font-extrabold text-[#ec71a8] hover:underline cursor-pointer flex items-center gap-1"
-                  >
-                    Ver los {monthlyServices.length} servicios en Informes y Edición →
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
-
-        {/* ================= VISTA 2: NUEVO REGISTRO ================= */}
-        {activeTab === 'nuevo_servicio' && (
-          <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-            <section className="card-luxury rounded-3xl p-4 sm:p-8">
-              <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/20">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg sm:text-2xl font-extrabold text-[#1e1e1c]">
-                      Registrar Nuevo Servicio
-                    </h3>
-                    <p className="text-[11px] sm:text-xs text-[#8c8884]">
-                      Ingresa los datos para calcular la comisión automáticamente
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs bg-[#fdebdd] text-[#b8860b] px-3 py-1.5 rounded-full border border-[#edd5b6] font-extrabold">
-                  GUADALUPE MAKE UP
-                </span>
-              </div>
-
-              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
-
-                  {/* 0. SALÓN / ESTUDIO (obligatorio) */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                      <Store className="w-4 h-4 text-[#ec71a8]" />
-                      Salón / Estudio
-                    </label>
-                    <SalonSelect
-                      value={regSalonId}
-                      onChange={(v) => handleRegSalonChange(v)}
-                      salones={salones}
-                    />
-                  </div>
-
-                  {/* 1. FECHA */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                      <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
-                      Fecha del Servicio
-                    </label>
-                    <input
-                      type="date"
-                      value={regDate}
-                      onChange={(e) => setRegDate(e.target.value)}
-                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
-                      required
-                    />
-                  </div>
-
-                  {/* 2. SERVICIO REALIZADO */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
-                      Servicio Realizado
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Maquillaje Social"
-                      value={regService}
-                      onChange={(e) => handleRegServiceChange(e.target.value)}
-                      disabled={esMaison(regSalonId)}
-                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
-                      required
-                    />
-                    {esMaison(regSalonId) && (
-                      <span className="text-[10px] font-bold text-[#ec71a8]">
-                        Maison Studio solo permite Maquillaje
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 3. PRECIO COBRADO */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-[#ec71a8]" />
-                      Precio Cobrado (S/)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={regPrice}
-                      onChange={(e) => setRegPrice(e.target.value)}
-                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
-                      required
-                    />
-                  </div>
-
-                  {/* 4. COMISIÓN (autocompletada, ajustable) */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                      <Percent className="w-4 h-4 text-[#ec71a8]" />
-                      Comisión (% Mi Ganancia)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={regCommission}
-                      onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
-                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
-                      required
-                    />
-                    <span className="text-[10px] font-semibold text-[#8c8884]">
-                      {esMaison(regSalonId)
-                        ? 'Auto: Maison Studio · Maquillaje 60%'
-                        : 'Auto: Maquillaje 40% · otros servicios 30%'}
-                    </span>
-                  </div>
-
-                </div>
-
-                {/* SERVICIOS EXTRA: misma clienta, misma transacción */}
-                <div className="rounded-2xl border border-dashed border-[#f9cee3] bg-[#fff9fb] p-3 sm:p-5 flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
-                      <span className="text-xs sm:text-sm font-extrabold text-[#1e1e1c]">Servicios extra (misma clienta)</span>
-                      {extraItems.length > 0 && (
-                        <span className="text-[10px] font-black bg-[#fce3ed] text-[#ec71a8] border border-[#f9cee3] px-2 py-0.5 rounded-full">
-                          {extraItems.length}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addExtraItem}
-                      className="px-3 py-2 rounded-xl bg-white border border-[#f9cee3] text-[#ec71a8] hover:bg-[#fce3ed] font-extrabold text-[11px] sm:text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Añadir servicio
-                    </button>
-                  </div>
-
-                  {extraItems.length === 0 ? (
-                    <p className="text-[11px] text-[#8c8884] font-medium">
-                      Si la clienta lleva más de un servicio, añádelos aquí: se guardan juntos con la misma fecha y salón.
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-2.5">
-                      {extraItems.map((it, idx) => (
-                        <div key={it.key} className="relative grid grid-cols-2 sm:grid-cols-[1fr_7rem_6rem] gap-2 items-end bg-white border border-[#f9cee3] rounded-2xl p-2.5 pr-12">
-                          <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">
-                              Servicio {idx + 2}
-                            </label>
-                            <input
-                              type="text"
-                              value={it.service}
-                              onChange={(e) => handleExtraServiceChange(it.key, e.target.value)}
-                              disabled={esMaison(regSalonId)}
-                              placeholder="Ej. Pestañas"
-                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-semibold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884]"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Precio S/</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={it.price}
-                              onChange={(e) => updateExtraItem(it.key, { price: e.target.value })}
-                              placeholder="0.00"
-                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Comisión %</label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="1"
-                              value={it.commission}
-                              onChange={(e) => updateExtraItem(it.key, { commission: Number(e.target.value) || 0 })}
-                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeExtraItem(it.key)}
-                            title="Quitar servicio extra"
-                            aria-label="Quitar servicio extra"
-                            className="absolute right-2 bottom-2 p-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 cursor-pointer transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-[#6b6764] px-1">
-                        <span>{extraItems.length} extra{extraItems.length === 1 ? '' : 's'} · Total S/ {extraTotal.toFixed(2)}</span>
-                        <span className="text-[#ec71a8]">Mi ganancia extra: S/ {extraMyGain.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* VISTA PREVIA DEL CÁLCULO EN VIVO (suma del servicio principal + extras) */}
-                {batchLivePrice > 0 && (
-                  <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-3.5 sm:p-5 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
-                      <span className="font-extrabold text-xs sm:text-sm text-[#1e1e1c]">
-                        Cálculo en Tiempo Real{itemsCount > 1 ? ` (${itemsCount} servicios)` : ''}:
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-[#8c8884] font-medium">Total: </span>
-                        <span className="font-extrabold text-[#1e1e1c]">S/ {batchLivePrice.toFixed(2)}</span>
-                      </div>
-                      <div className="bg-[#ec71a8] text-white px-3 py-1.5 rounded-xl font-extrabold shadow-sm">
-                        Mi Ganancia: S/ {batchLiveMyGain.toFixed(2)}
-                      </div>
-                      <div className="bg-[#1e1e1c] text-[#ecc880] px-3 py-1.5 rounded-xl font-bold">
-                        Salón: S/ {batchLiveSalonGain.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-[#fce3ed]">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('resumen')}
-                    className="px-6 py-3.5 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-sm text-[#6b6764] cursor-pointer transition-colors"
-                  >
-                    Volver al Panel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-[#ec71a8]/25 cursor-pointer flex items-center gap-2 transition-transform active:scale-98"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    {itemsCount > 1 ? `Guardar ${itemsCount} servicios` : 'Guardar Registro de Servicio'}
-                  </button>
-                </div>
-              </form>
-            </section>
           </div>
         )}
 
@@ -2367,158 +2068,16 @@ export default function App() {
       
         {activeTab === 'productos' && (
           <section className="flex flex-col gap-6">
-            {/* Formulario de registro (en móvil se abre con el FAB "Producto") */}
-            <div ref={productFormRef} className={`card-luxury rounded-3xl p-4 sm:p-8 bg-white/95 scroll-mt-24 ${showProductForm ? 'block' : 'hidden lg:block'}`}>
-              <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] flex items-center justify-center shadow-md shadow-[#ec71a8]/25 shrink-0">
-                    <PlusCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c]">Registrar Producto</h3>
-                    <p className="text-[11px] sm:text-xs text-[#6b6764] font-medium">Añade maquillaje o insumos al inventario</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowProductForm(false)}
-                  aria-label="Cerrar formulario de producto"
-                  className="lg:hidden p-2 rounded-xl bg-[#fce3ed] text-[#8c8884] hover:text-[#1e1e1c] cursor-pointer shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateProduct} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Nombre del producto
-                  </label>
-                  <input
-                    type="text"
-                    value={prodName}
-                    onChange={(e) => setProdName(e.target.value)}
-                    placeholder="Ej: Pestañina Maybelline"
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Cantidad
-                  </label>
-                  <input
-                    type="number"
-                    value={1}
-                    disabled
-                    readOnly
-                    aria-label="Cantidad fija: 1 unidad"
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold bg-[#fce3ed]/50 text-[#8c8884] cursor-not-allowed outline-none"
-                  />
-                  <span className="text-[10px] font-semibold text-[#8c8884]">Stock unitario · 1 por producto</span>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Precio / Costo (S/)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={prodPrice}
-                    onChange={(e) => setProdPrice(e.target.value)}
-                    placeholder="0.00"
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Fecha de compra
-                  </label>
-                  <input
-                    type="date"
-                    value={prodPurchaseDate}
-                    onChange={(e) => handlePurchaseDateChange(e.target.value)}
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <CalendarCheck className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={prodStartDate}
-                    onChange={(e) => setProdStartDate(e.target.value)}
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Caducidad
-                  </label>
-                  <BrandSelect
-                    value={prodExpiryPreset}
-                    onChange={handleExpiryPresetChange}
-                    options={[
-                      { value: '6', label: '6 meses', desc: 'Caducidad automática' },
-                      { value: '12', label: '12 meses', desc: 'Caducidad automática' },
-                      { value: '', label: 'Personalizada', desc: 'Elegir la fecha a mano' },
-                    ]}
-                    placeholder="Elegir duración"
-                    icon={Clock}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Fecha de caducidad
-                  </label>
-                  <input
-                    type="date"
-                    value={prodExpirationDate}
-                    onChange={(e) => { setProdExpirationDate(e.target.value); setProdExpiryPreset(''); }}
-                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
-                    required
-                  />
-                  <span className="text-[10px] font-semibold text-[#8c8884]">Se calcula sola con 6 o 12 meses</span>
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-3 flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-xs shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Registrar Producto
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Buscador + listado */}
-            <div className="card-luxury rounded-3xl p-4 sm:p-8 bg-white/90 backdrop-blur-sm">
+            {/* Buscador + listado (tema negro & dorado) */}
+            <div className="rounded-3xl p-4 sm:p-8 bg-[#151513] border border-[#ecc880]/25 shadow-xl shadow-black/20">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#fce3ed] flex items-center justify-center">
-                    <ShoppingBag className="w-5 h-5 text-[#ec71a8]" />
+                  <div className="w-10 h-10 rounded-xl bg-[#ecc880]/15 border border-[#ecc880]/30 flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5 text-[#ecc880]" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-extrabold text-[#1e1e1c]">Mis Productos</h3>
-                    <p className="text-xs text-[#6b6764] font-medium">
+                    <h3 className="text-lg font-extrabold text-white">Mis Productos</h3>
+                    <p className="text-xs text-[#8c8884] font-medium">
                       {products.length} producto{products.length === 1 ? '' : 's'} registrado{products.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -2534,14 +2093,14 @@ export default function App() {
                         setProductSearch(e.target.value);
                         fetchProducts(e.target.value, productStatusFilter);
                       }}
-                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#f9cee3] text-sm font-medium bg-[#faf5f8] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 w-full sm:w-56"
+                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#ecc880]/25 text-sm font-medium bg-[#1e1e1c] text-white placeholder-[#8c8884] outline-none focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15 w-full sm:w-56"
                     />
                   </div>
-                  <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#fce3ed]/60 border border-[#f9cee3]">
+                  <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#1e1e1c] border border-[#ecc880]/25">
                     <button
                       onClick={() => setProductStatusFilter('activo')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'activo' ? 'bg-[#ec71a8] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                        productStatusFilter === 'activo' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
                       }`}
                     >
                       🟢 Activos
@@ -2549,7 +2108,7 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('terminado')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'terminado' ? 'bg-[#1e1e1c] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                        productStatusFilter === 'terminado' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
                       }`}
                     >
                       ⚫ Terminados
@@ -2557,21 +2116,28 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('todos')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'todos' ? 'bg-[#d95392] text-white shadow-sm' : 'text-[#8c8884] hover:text-[#1e1e1c]'
+                        productStatusFilter === 'todos' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
                       }`}
                     >
                       Todos
                     </button>
                   </div>
+                  <button
+                    onClick={openProducto}
+                    className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#ecc880] to-[#c89b6b] text-[#151513] font-extrabold text-xs shadow-md shadow-black/30 hover:opacity-95 cursor-pointer whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
+                    Registrar Producto
+                  </button>
                 </div>
               </div>
 
               {productLoading ? (
-                <div className="py-12 text-center text-[#6b6764] text-sm font-medium">Cargando productos...</div>
+                <div className="py-12 text-center text-[#8c8884] text-sm font-medium">Cargando productos...</div>
               ) : products.length === 0 ? (
                 <div className="py-12 text-center">
-                  <Package className="w-12 h-12 text-[#f9cee3] mx-auto mb-3" />
-                  <p className="text-sm text-[#6b6764] font-medium">
+                  <Package className="w-12 h-12 text-[#ecc880]/40 mx-auto mb-3" />
+                  <p className="text-sm text-[#8c8884] font-medium">
                     {productSearch ? 'No se encontraron productos con ese nombre.' : 'Aún no tienes productos registrados.'}
                   </p>
                 </div>
@@ -2584,16 +2150,16 @@ export default function App() {
                       ? { color: 'gray', label: 'Terminado / Agotado', days: null }
                       : getExpirationState(p.expiration_date);
                     const colorMap = {
-                      green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-                      yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
-                      red: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
-                      gray: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', dot: 'bg-slate-400' },
+                      green: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
+                      yellow: { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30', dot: 'bg-amber-400' },
+                      red: { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30', dot: 'bg-rose-400' },
+                      gray: { bg: 'bg-slate-500/15', text: 'text-slate-300', border: 'border-slate-500/30', dot: 'bg-slate-400' },
                     };
                     const c = colorMap[state.color];
                     return (
-                      <div key={p.id} className={`relative rounded-2xl border-2 ${c.border} ${c.bg} p-5 transition-all hover:shadow-md ${isTerminated ? 'opacity-75 grayscale-[30%]' : ''}`}>
+                      <div key={p.id} className={`relative rounded-2xl border ${c.border} bg-[#1e1e1c] p-5 transition-all hover:border-[#ecc880]/60 hover:shadow-lg hover:shadow-black/30 ${isTerminated ? 'opacity-70 grayscale-[35%]' : ''}`}>
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <h4 className={`font-extrabold text-base leading-tight flex-1 ${isTerminated ? 'text-[#6b6764] line-through' : 'text-[#1e1e1c]'}`}>{p.name}</h4>
+                          <h4 className={`font-extrabold text-base leading-tight flex-1 ${isTerminated ? 'text-[#8c8884] line-through' : 'text-white'}`}>{p.name}</h4>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${c.bg} ${c.text} text-[10px] font-extrabold uppercase tracking-wider border ${c.border}`}>
                             <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
                             {isTerminated ? 'Terminado' : ''}
@@ -2604,28 +2170,28 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="space-y-1.5 text-xs text-[#4a4744] font-medium">
+                        <div className="space-y-1.5 text-xs text-[#8c8884] font-medium">
                           <div className="flex items-center justify-between">
                             <span className="text-[#8c8884]">Cantidad:</span>
-                            <span className="font-bold text-[#1e1e1c]">{isTerminated ? 0 : p.quantity}</span>
+                            <span className="font-bold text-white">{isTerminated ? 0 : p.quantity}</span>
                           </div>
                           {p.price > 0 && (
                             <div className="flex items-center justify-between">
                               <span className="text-[#8c8884]">Precio:</span>
-                              <span className="font-bold text-[#1e1e1c]">S/ {Number(p.price).toFixed(2)}</span>
+                              <span className="font-bold text-[#ecc880]">S/ {Number(p.price).toFixed(2)}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
                             <span className="text-[#8c8884]">Compra:</span>
-                            <span className="font-bold text-[#1e1e1c]">{p.purchase_date}</span>
+                            <span className="font-bold text-white">{p.purchase_date}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[#8c8884]">Caducidad:</span>
-                            <span className="font-bold text-[#1e1e1c]">{p.expiration_date}</span>
+                            <span className="font-bold text-white">{p.expiration_date}</span>
                           </div>
-                          <div className="flex items-center justify-between pt-1.5 border-t border-current/10">
+                          <div className="flex items-center justify-between pt-1.5 border-t border-[#ecc880]/15">
                             <span className="text-[#8c8884]">Apertura:</span>
-                            <span className={`font-bold ${p.start_date ? 'text-[#1e1e1c]' : 'text-[#8c8884] italic'}`}>
+                            <span className={`font-bold ${p.start_date ? 'text-white' : 'text-[#8c8884] italic'}`}>
                               {p.start_date || 'Sin abrir'}
                             </span>
                           </div>
@@ -2635,11 +2201,11 @@ export default function App() {
                           {isTerminated ? '⚠️ Terminado / Agotado — fuera del semáforo de vencimiento' : state.label}
                         </div>
 
-                        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-current/10">
+                        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-[#ecc880]/15">
                           {!isTerminated && !p.start_date && (
                             <button
                               onClick={() => handleOpenToday(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#ec71a8]/40 text-[#ec71a8] hover:bg-[#fce3ed] font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#ecc880]/10 border border-[#ecc880]/40 text-[#ecc880] hover:bg-[#ecc880]/25 font-bold text-xs transition-colors cursor-pointer"
                               title="Marca este producto como abierto hoy"
                             >
                               <CalendarCheck className="w-3.5 h-3.5" />
@@ -2649,7 +2215,7 @@ export default function App() {
                           {!isTerminated && (
                             <button
                               onClick={() => handleFinishProduct(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#1e1e1c]/30 text-[#1e1e1c] hover:bg-[#1e1e1c] hover:text-white font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-[#ecc880]/25 text-[#ecc880] hover:border-[#ecc880] font-bold text-xs transition-colors cursor-pointer"
                               title="Marcar este producto como terminado/agotado"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -2659,7 +2225,7 @@ export default function App() {
                           {isTerminated && (
                             <button
                               onClick={() => handleReactivateProduct(p.id)}
-                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-emerald-400/40 text-emerald-600 hover:bg-emerald-50 font-bold text-xs transition-colors cursor-pointer"
+                              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/25 font-bold text-xs transition-colors cursor-pointer"
                               title="Volver a activar este producto"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -2668,14 +2234,14 @@ export default function App() {
                           )}
                           <button
                             onClick={() => openEditProduct(p)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#f9cee3] text-[#4a4744] hover:bg-[#fce3ed] hover:text-[#1e1e1c] font-bold text-xs transition-colors cursor-pointer"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-[#ecc880]/25 text-[#ecc880] hover:border-[#ecc880] font-bold text-xs transition-colors cursor-pointer"
                             title="Editar producto"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(p.id)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 font-bold text-xs transition-colors cursor-pointer"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#1e1e1c] border border-rose-400/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs transition-colors cursor-pointer"
                             title="Eliminar producto"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -2691,6 +2257,433 @@ export default function App() {
         )}
 
 </main>
+
+        {/* ================= MODAL: REGISTRAR SERVICIO (overlay + backdrop blur) ================= */}
+        {showRegistroModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1e1e1c]/60 backdrop-blur-md sm:p-4"
+            onClick={closeRegistro}
+          >
+            <section
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[#f9cee3] flex flex-col overflow-hidden animate-modal"
+            >
+              {/* CABECERA: cierre a la IZQUIERDA */}
+              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#fce3ed] px-4 py-3 sm:px-6">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={closeRegistro}
+                    aria-label="Cerrar registro de servicio"
+                    className="p-2 rounded-xl bg-[#fce3ed] text-[#1e1e1c] hover:bg-[#f9cee3] cursor-pointer shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] truncate">Registrar Servicio</h3>
+                    <p className="text-[10px] sm:text-xs text-[#8c8884] truncate">Comisión automática según salón y servicio</p>
+                  </div>
+                </div>
+                <span className="hidden sm:inline text-[10px] bg-[#fdebdd] text-[#b8860b] px-2.5 py-1 rounded-full border border-[#edd5b6] font-extrabold whitespace-nowrap">
+                  GUADALUPE MAKE UP
+                </span>
+              </div>
+
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
+
+                    {/* 0. SALÓN / ESTUDIO (obligatorio) */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Store className="w-4 h-4 text-[#ec71a8]" />
+                        Salón / Estudio
+                      </label>
+                      <SalonSelect
+                        value={regSalonId}
+                        onChange={(v) => handleRegSalonChange(v)}
+                        salones={salones}
+                      />
+                    </div>
+
+                    {/* 1. FECHA */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
+                        Fecha del Servicio
+                      </label>
+                      <input
+                        type="date"
+                        value={regDate}
+                        onChange={(e) => setRegDate(e.target.value)}
+                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        required
+                      />
+                    </div>
+
+                    {/* 2. SERVICIO REALIZADO */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                        Servicio Realizado
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Maquillaje Social"
+                        value={regService}
+                        onChange={(e) => handleRegServiceChange(e.target.value)}
+                        disabled={esMaison(regSalonId)}
+                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
+                        required
+                      />
+                      {esMaison(regSalonId) && (
+                        <span className="text-[10px] font-bold text-[#ec71a8]">
+                          Maison Studio solo permite Maquillaje
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 3. PRECIO COBRADO */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <DollarSign className="w-4 h-4 text-[#ec71a8]" />
+                        Precio Cobrado (S/)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={regPrice}
+                        onChange={(e) => setRegPrice(e.target.value)}
+                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        required
+                      />
+                    </div>
+
+                    {/* 4. COMISIÓN (autocompletada, ajustable) */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                        <Percent className="w-4 h-4 text-[#ec71a8]" />
+                        Comisión (% Mi Ganancia)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={regCommission}
+                        onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
+                        className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                        required
+                      />
+                      <span className="text-[10px] font-semibold text-[#8c8884]">
+                        {esMaison(regSalonId)
+                          ? 'Auto: Maison Studio · Maquillaje 60%'
+                          : 'Auto: Maquillaje 40% · otros servicios 30%'}
+                      </span>
+                    </div>
+
+                  </div>
+
+                  {/* SERVICIOS EXTRA: misma clienta, misma transacción */}
+                  <div className="rounded-2xl border border-dashed border-[#f9cee3] bg-[#fff9fb] p-3 sm:p-5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                        <span className="text-xs sm:text-sm font-extrabold text-[#1e1e1c]">Servicios extra (misma clienta)</span>
+                        {extraItems.length > 0 && (
+                          <span className="text-[10px] font-black bg-[#fce3ed] text-[#ec71a8] border border-[#f9cee3] px-2 py-0.5 rounded-full">
+                            {extraItems.length}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addExtraItem}
+                        className="px-3 py-2 rounded-xl bg-white border border-[#f9cee3] text-[#ec71a8] hover:bg-[#fce3ed] font-extrabold text-[11px] sm:text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Añadir servicio
+                      </button>
+                    </div>
+
+                    {extraItems.length === 0 ? (
+                      <p className="text-[11px] text-[#8c8884] font-medium">
+                        Si la clienta lleva más de un servicio, añádelos aquí: se guardan juntos con la misma fecha y salón.
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-2.5">
+                        {extraItems.map((it, idx) => (
+                          <div key={it.key} className="relative grid grid-cols-2 sm:grid-cols-[1fr_7rem_6rem] gap-2 items-end bg-white border border-[#f9cee3] rounded-2xl p-2.5 pr-12">
+                            <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">
+                                Servicio {idx + 2}
+                              </label>
+                              <input
+                                type="text"
+                                value={it.service}
+                                onChange={(e) => handleExtraServiceChange(it.key, e.target.value)}
+                                disabled={esMaison(regSalonId)}
+                                placeholder="Ej. Pestañas"
+                                className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-semibold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884]"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Precio S/</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={it.price}
+                                onChange={(e) => updateExtraItem(it.key, { price: e.target.value })}
+                                placeholder="0.00"
+                                className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Comisión %</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={it.commission}
+                                onChange={(e) => updateExtraItem(it.key, { commission: Number(e.target.value) || 0 })}
+                                className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeExtraItem(it.key)}
+                              title="Quitar servicio extra"
+                              aria-label="Quitar servicio extra"
+                              className="absolute right-2 bottom-2 p-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 cursor-pointer transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-[#6b6764] px-1">
+                          <span>{extraItems.length} extra{extraItems.length === 1 ? '' : 's'} · Total S/ {extraTotal.toFixed(2)}</span>
+                          <span className="text-[#ec71a8]">Mi ganancia extra: S/ {extraMyGain.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VISTA PREVIA DEL CÁLCULO EN VIVO (suma del servicio principal + extras) */}
+                  {batchLivePrice > 0 && (
+                    <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-3.5 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                        <span className="font-extrabold text-xs sm:text-sm text-[#1e1e1c]">
+                          Cálculo en Tiempo Real{itemsCount > 1 ? ` (${itemsCount} servicios)` : ''}:
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
+                        <div>
+                          <span className="text-[#8c8884] font-medium">Total: </span>
+                          <span className="font-extrabold text-[#1e1e1c]">S/ {batchLivePrice.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-[#ec71a8] text-white px-3 py-1.5 rounded-xl font-extrabold shadow-sm">
+                          Mi Ganancia: S/ {batchLiveMyGain.toFixed(2)}
+                        </div>
+                        <div className="bg-[#1e1e1c] text-[#ecc880] px-3 py-1.5 rounded-xl font-bold">
+                          Salón: S/ {batchLiveSalonGain.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                <div className="shrink-0 border-t border-[#fce3ed] bg-white px-4 sm:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={closeRegistro}
+                    className="px-5 py-3 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-sm text-[#6b6764] cursor-pointer whitespace-nowrap"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-[#ec71a8]/25 cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                    Guardar
+                    {itemsCount > 1 && (
+                      <span className="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-black">{itemsCount}</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
+        {/* ================= MODAL: REGISTRAR PRODUCTO (overlay, negro & dorado) ================= */}
+        {showProductModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md sm:p-4"
+            onClick={closeProducto}
+          >
+            <section
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl bg-[#151513] border border-[#ecc880]/30 shadow-2xl flex flex-col overflow-hidden animate-modal"
+            >
+              {/* CABECERA: cierre a la IZQUIERDA */}
+              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#ecc880]/20 px-4 py-3 sm:px-6">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={closeProducto}
+                    aria-label="Cerrar registro de producto"
+                    className="p-2 rounded-xl bg-[#ecc880]/15 text-[#ecc880] hover:bg-[#ecc880]/25 cursor-pointer shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-extrabold text-white truncate">Registrar Producto</h3>
+                    <p className="text-[10px] sm:text-xs text-[#8c8884] truncate">Inventario unitario · caducidad automática</p>
+                  </div>
+                </div>
+                <span className="hidden sm:inline text-[10px] bg-[#ecc880]/15 text-[#ecc880] px-2.5 py-1 rounded-full border border-[#ecc880]/40 font-extrabold whitespace-nowrap">
+                  INVENTARIO
+                </span>
+              </div>
+
+              <form onSubmit={handleCreateProduct} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Nombre del producto
+                    </label>
+                    <input
+                      type="text"
+                      value={prodName}
+                      onChange={(e) => setProdName(e.target.value)}
+                      placeholder="Ej: Pestañina Maybelline"
+                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white placeholder-[#8c8884] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Cantidad
+                    </label>
+                    <input
+                      type="number"
+                      value={1}
+                      disabled
+                      readOnly
+                      aria-label="Cantidad fija: 1 unidad"
+                      className="w-full p-3 border border-[#ecc880]/15 rounded-2xl text-sm font-bold bg-[#ecc880]/10 text-[#8c8884] cursor-not-allowed outline-none"
+                    />
+                    <span className="text-[10px] font-semibold text-[#8c8884]">Stock unitario · 1 por producto</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Precio / Costo (S/)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={prodPrice}
+                      onChange={(e) => setProdPrice(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white placeholder-[#8c8884] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Fecha de compra
+                    </label>
+                    <input
+                      type="date"
+                      value={prodPurchaseDate}
+                      onChange={(e) => handlePurchaseDateChange(e.target.value)}
+                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <CalendarCheck className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={prodStartDate}
+                      onChange={(e) => setProdStartDate(e.target.value)}
+                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Caducidad
+                    </label>
+                    <BrandSelect
+                      value={prodExpiryPreset}
+                      onChange={handleExpiryPresetChange}
+                      dark
+                      options={[
+                        { value: '6', label: '6 meses', desc: 'Caducidad automática' },
+                        { value: '12', label: '12 meses', desc: 'Caducidad automática' },
+                        { value: '', label: 'Personalizada', desc: 'Elegir la fecha a mano' },
+                      ]}
+                      placeholder="Elegir duración"
+                      icon={Clock}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#ecc880]" />
+                      Fecha de caducidad
+                    </label>
+                    <input
+                      type="date"
+                      value={prodExpirationDate}
+                      onChange={(e) => { setProdExpirationDate(e.target.value); setProdExpiryPreset(''); }}
+                      className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
+                      required
+                    />
+                    <span className="text-[10px] font-semibold text-[#8c8884]">Se calcula sola con 6 o 12 meses</span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 border-t border-[#ecc880]/20 bg-[#151513] px-4 sm:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={closeProducto}
+                    className="px-5 py-3 rounded-2xl border border-[#8c8884]/40 bg-[#1e1e1c] hover:border-[#ecc880]/60 text-[#8c8884] hover:text-[#ecc880] font-bold text-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ecc880] to-[#c89b6b] text-[#151513] font-extrabold text-sm shadow-lg shadow-black/40 hover:opacity-95 cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" strokeWidth={3} />
+                    Registrar
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
+
 
       {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas + FAB flotante) ================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)] pb-[env(safe-area-inset-bottom)]">
@@ -2722,33 +2715,31 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ================= FAB: REGISTRAR SERVICIO (móvil, centrado sobre la barra) ================= */}
-      {/* Se oculta dentro del propio formulario de registro para no tapar los campos */}
-      {activeTab !== 'nuevo_servicio' && (
+      {/* ================= FAB ARRASTRABLE: REGISTRAR SERVICIO (móvil, abajo a la derecha) ================= */}
+      {!anyModalOpen && activeTab !== 'productos' && (
         <button
-          onClick={openRegistro}
+          type="button"
+          {...serviceFab.handlers}
+          style={serviceFab.style}
           aria-label="Registrar nuevo servicio"
-          title="Registrar servicio"
-          className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white transition-transform duration-200 active:scale-95"
+          title="Registrar servicio · mantén pulsado para mover"
+          className="md:hidden fixed z-40 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white select-none cursor-grab active:cursor-grabbing"
         >
           <Plus className="w-6 h-6" strokeWidth={3} />
         </button>
       )}
 
-      {/* ================= FAB: REGISTRAR PRODUCTO (móvil, dentro del módulo Productos) ================= */}
-      {activeTab === 'productos' && !showProductForm && (
+      {/* ================= FAB EXCLUSIVO DE PRODUCTOS (negro & dorado) ================= */}
+      {!anyModalOpen && activeTab === 'productos' && (
         <button
-          onClick={() => {
-            setShowProductForm(true);
-            setTimeout(() => {
-              if (productFormRef.current) productFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 80);
-          }}
+          type="button"
+          {...productFab.handlers}
+          style={productFab.style}
           aria-label="Registrar producto"
-          className="md:hidden fixed right-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-1.5 pl-3 pr-4 py-3 rounded-full bg-[#1e1e1c] text-[#ecc880] font-extrabold text-xs shadow-lg shadow-black/25 ring-2 ring-white/70 active:scale-95"
+          title="Registrar producto · mantén pulsado para mover"
+          className="md:hidden fixed z-40 w-14 h-14 rounded-full bg-gradient-to-br from-[#2c2b28] to-[#151513] text-[#ecc880] border border-[#ecc880]/60 flex items-center justify-center shadow-lg shadow-black/40 ring-2 ring-[#ecc880]/40 select-none cursor-grab active:cursor-grabbing"
         >
-          <Plus className="w-4 h-4" strokeWidth={3} />
-          Producto
+          <Plus className="w-6 h-6" strokeWidth={3} />
         </button>
       )}
 
