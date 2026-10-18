@@ -1441,7 +1441,7 @@ export default function App() {
           ) : (
             <div className="flex items-center gap-3 shrink-0">
               {activeTab === 'productos' && (
-                <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
+                <span className="text-xs font-bold bg-[#ecc880]/15 text-[#8a5a3e] px-3.5 py-1.5 rounded-xl border border-[#ecc880]/40">
                   {products.length} {products.length === 1 ? 'producto' : 'productos'}
                 </span>
               )}
@@ -2077,7 +2077,7 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="text-lg font-extrabold text-white">Mis Productos</h3>
-                    <p className="text-xs text-[#8c8884] font-medium">
+                    <p className="text-xs text-[#b9b3a6] font-medium">
                       {products.length} producto{products.length === 1 ? '' : 's'} registrado{products.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -2093,14 +2093,14 @@ export default function App() {
                         setProductSearch(e.target.value);
                         fetchProducts(e.target.value, productStatusFilter);
                       }}
-                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#ecc880]/25 text-sm font-medium bg-[#1e1e1c] text-white placeholder-[#8c8884] outline-none focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15 w-full sm:w-56"
+                      className="pl-9 pr-4 py-2.5 rounded-2xl border border-[#ecc880]/25 text-sm font-medium bg-[#1e1e1c] text-white placeholder-[#b9b3a6] outline-none focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15 w-full sm:w-56"
                     />
                   </div>
                   <div className="flex items-center gap-1 p-1 rounded-2xl bg-[#1e1e1c] border border-[#ecc880]/25">
                     <button
                       onClick={() => setProductStatusFilter('activo')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'activo' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
+                        productStatusFilter === 'activo' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
                       }`}
                     >
                       🟢 Activos
@@ -2108,7 +2108,7 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('terminado')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'terminado' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
+                        productStatusFilter === 'terminado' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
                       }`}
                     >
                       ⚫ Terminados
@@ -2116,7 +2116,7 @@ export default function App() {
                     <button
                       onClick={() => setProductStatusFilter('todos')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                        productStatusFilter === 'todos' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#8c8884] hover:text-[#ecc880]'
+                        productStatusFilter === 'todos' ? 'bg-[#ecc880] text-[#151513] shadow-sm' : 'text-[#b9b3a6] hover:text-[#ecc880]'
                       }`}
                     >
                       Todos
@@ -2170,28 +2170,28 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="space-y-1.5 text-xs text-[#8c8884] font-medium">
+                        <div className="space-y-1.5 text-xs text-[#b9b3a6] font-medium">
                           <div className="flex items-center justify-between">
-                            <span className="text-[#8c8884]">Cantidad:</span>
+                            <span className="text-[#b9b3a6]">Cantidad:</span>
                             <span className="font-bold text-white">{isTerminated ? 0 : p.quantity}</span>
                           </div>
                           {p.price > 0 && (
                             <div className="flex items-center justify-between">
-                              <span className="text-[#8c8884]">Precio:</span>
+                              <span className="text-[#b9b3a6]">Precio:</span>
                               <span className="font-bold text-[#ecc880]">S/ {Number(p.price).toFixed(2)}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
-                            <span className="text-[#8c8884]">Compra:</span>
+                            <span className="text-[#b9b3a6]">Compra:</span>
                             <span className="font-bold text-white">{p.purchase_date}</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[#8c8884]">Caducidad:</span>
+                            <span className="text-[#b9b3a6]">Caducidad:</span>
                             <span className="font-bold text-white">{p.expiration_date}</span>
                           </div>
                           <div className="flex items-center justify-between pt-1.5 border-t border-[#ecc880]/15">
-                            <span className="text-[#8c8884]">Apertura:</span>
-                            <span className={`font-bold ${p.start_date ? 'text-white' : 'text-[#8c8884] italic'}`}>
+                            <span className="text-[#b9b3a6]">Apertura:</span>
+                            <span className={`font-bold ${p.start_date ? 'text-white' : 'text-[#b9b3a6] italic'}`}>
                               {p.start_date || 'Sin abrir'}
                             </span>
                           </div>
@@ -2544,7 +2544,7 @@ export default function App() {
                   </button>
                   <div className="min-w-0">
                     <h3 className="text-base sm:text-lg font-extrabold text-white truncate">Registrar Producto</h3>
-                    <p className="text-[10px] sm:text-xs text-[#8c8884] truncate">Inventario unitario · caducidad automática</p>
+                    <p className="text-[10px] sm:text-xs text-[#b9b3a6] truncate">Inventario unitario · caducidad automática</p>
                   </div>
                 </div>
                 <span className="hidden sm:inline text-[10px] bg-[#ecc880]/15 text-[#ecc880] px-2.5 py-1 rounded-full border border-[#ecc880]/40 font-extrabold whitespace-nowrap">
@@ -2580,9 +2580,9 @@ export default function App() {
                       disabled
                       readOnly
                       aria-label="Cantidad fija: 1 unidad"
-                      className="w-full p-3 border border-[#ecc880]/15 rounded-2xl text-sm font-bold bg-[#ecc880]/10 text-[#8c8884] cursor-not-allowed outline-none"
+                      className="w-full p-3 border border-[#ecc880]/15 rounded-2xl text-sm font-bold bg-[#ecc880]/10 text-[#b9b3a6] cursor-not-allowed outline-none"
                     />
-                    <span className="text-[10px] font-semibold text-[#8c8884]">Stock unitario · 1 por producto</span>
+                    <span className="text-[10px] font-semibold text-[#b9b3a6]">Stock unitario · 1 por producto</span>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -2618,7 +2618,7 @@ export default function App() {
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-[#ecc880]/80 flex items-center gap-1.5">
                       <CalendarCheck className="w-3.5 h-3.5 text-[#ecc880]" />
-                      Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
+                      Fecha de apertura <span className="text-[#b9b3a6] normal-case font-medium">(opcional)</span>
                     </label>
                     <input
                       type="date"
@@ -2659,7 +2659,7 @@ export default function App() {
                       className="w-full p-3 border border-[#ecc880]/25 rounded-2xl text-sm font-bold outline-none bg-[#1e1e1c] text-white [color-scheme:dark] focus:border-[#ecc880] focus:ring-2 focus:ring-[#ecc880]/15"
                       required
                     />
-                    <span className="text-[10px] font-semibold text-[#8c8884]">Se calcula sola con 6 o 12 meses</span>
+                    <span className="text-[10px] font-semibold text-[#b9b3a6]">Se calcula sola con 6 o 12 meses</span>
                   </div>
                 </div>
 
@@ -2667,7 +2667,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={closeProducto}
-                    className="px-5 py-3 rounded-2xl border border-[#8c8884]/40 bg-[#1e1e1c] hover:border-[#ecc880]/60 text-[#8c8884] hover:text-[#ecc880] font-bold text-sm cursor-pointer whitespace-nowrap"
+                    className="px-5 py-3 rounded-2xl border border-[#8c8884]/40 bg-[#1e1e1c] hover:border-[#ecc880]/60 text-[#b9b3a6] hover:text-[#ecc880] font-bold text-sm cursor-pointer whitespace-nowrap"
                   >
                     Cancelar
                   </button>
@@ -2691,7 +2691,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('resumen')}
             aria-label="Resumen general"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span className="text-[10px] font-bold">Resumen</span>
@@ -2699,7 +2699,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('productos')}
             aria-label="Mis productos"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
           >
             <Package className="w-5 h-5" />
             <span className="text-[10px] font-bold">Productos</span>
@@ -2707,7 +2707,7 @@ export default function App() {
           <button
             onClick={() => setActiveTab('informes')}
             aria-label="Informes y edición"
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#b9b3a6]'}`}
           >
             <FileText className="w-5 h-5" />
             <span className="text-[10px] font-bold">Informes</span>
