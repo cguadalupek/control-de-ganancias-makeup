@@ -43,6 +43,20 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "hermes3")
 OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
 
+# La API exige sesión de usuario o la clave de servicio interna. El bot es un cliente
+# máquina a máquina: se identifica con la cabecera X-Internal-Key (INTERNAL_API_KEY),
+# la misma variable de entorno que usa main.py. Así no necesita credenciales de persona.
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
+
+API = requests.Session()
+if INTERNAL_API_KEY:
+    API.headers.update({"X-Internal-Key": INTERNAL_API_KEY})
+else:
+    logger.warning(
+        "INTERNAL_API_KEY no está definida: la API rechazará las llamadas del bot (401). "
+        "Defínela en backend/.env con el mismo valor que usa el backend."
+    )
+
 
 # ============================================================
 # UTILIDADES DE PRODUCTOS
@@ -105,7 +119,7 @@ def api_list_products(q: Optional[str] = None) -> List[Dict[str, Any]]:
         url = f"{BACKEND_URL}/products"
         if q:
             url += f"?q={requests.utils.quote(q)}"
-        r = requests.get(url, timeout=10)
+        r = API.get(url, timeout=10)
         r.raise_for_status()
         return r.json().get("products", [])
     except Exception as e:
@@ -115,7 +129,7 @@ def api_list_products(q: Optional[str] = None) -> List[Dict[str, Any]]:
 
 def api_open_product(product_id: int) -> Optional[Dict[str, Any]]:
     try:
-        r = requests.patch(f"{BACKEND_URL}/products/{product_id}/open", timeout=10)
+        r = API.patch(f"{BACKEND_URL}/products/{product_id}/open", timeout=10)
         r.raise_for_status()
         return r.json().get("product")
     except Exception as e:
@@ -126,7 +140,7 @@ def api_open_product(product_id: int) -> Optional[Dict[str, Any]]:
 def api_finish_product(product_id: int) -> Optional[Dict[str, Any]]:
     """Marca un producto como terminado/agotado."""
     try:
-        r = requests.patch(f"{BACKEND_URL}/products/{product_id}/finish", timeout=10)
+        r = API.patch(f"{BACKEND_URL}/products/{product_id}/finish", timeout=10)
         r.raise_for_status()
         return r.json().get("product")
     except Exception as e:
@@ -137,7 +151,7 @@ def api_finish_product(product_id: int) -> Optional[Dict[str, Any]]:
 def api_delete_product(product_id: int) -> bool:
     """Elimina un producto del inventario."""
     try:
-        r = requests.delete(f"{BACKEND_URL}/products/{product_id}", timeout=10)
+        r = API.delete(f"{BACKEND_URL}/products/{product_id}", timeout=10)
         r.raise_for_status()
         return True
     except Exception as e:

@@ -1,13 +1,22 @@
-__pycache__/
-*.pyc
+# Credenciales y configuración sensible: NUNCA se versionan
 .env
-.env.local
+.env.*
+*.env
+*.key
+*.pem
+secrets*
+
+# Datos locales / base de datos
 *.db
 data/salon.db
+*.db.bak*
+/backups/
+
+# Artefactos de build y dependencias
 node_modules/
 dist/
-.DS_Store
+__pycache__/
+*.pyc
 .venv/
 venv/
-/backups/
-*.db.bak*
+.DS_Store

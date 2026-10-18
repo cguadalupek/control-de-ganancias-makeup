@@ -25,6 +25,8 @@ services:
     restart: always
     command: tunnel run
     environment:
+      # El token del túnel vive en el archivo .env de la raíz (ignorado por git),
+      # nunca en este archivo versionado.
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     depends_on:
       - frontend

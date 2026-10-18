@@ -14,6 +14,8 @@ La interfaz está pensada **primero para el móvil** (se usa con el pulgar, en e
 
 ## ✨ Características Principales
 
+- 🔐 **Acceso con usuario y contraseña:** pantalla de ingreso con la identidad de la marca (mismo estilo que la app), sesión persistente de **30 días** y dos niveles de acceso: **maquilladora** (las secciones de siempre) y **administrador** (además ve **Configuración** para crear y administrar usuarios).
+- ⚙️ **Sección Configuración (solo administrador):** alta de usuarios con nombre, usuario, contraseña y nivel de acceso; lista de usuarios con rol, estado y último ingreso; cambio de rol, restablecer contraseña, activar/desactivar y eliminar; además, cambio de la contraseña propia y cierre de sesión.
 - ✨ **Marca y PWA Rodríguez:** monograma “R”, favicon e iconos propios, manifiesto, service worker y aviso de instalación cuando el navegador admite instalar la aplicación.
 - 📱 **UI/UX refinada:** registro de servicio de un solo paso con etiquetas alineadas, modales centrados con scroll interno y cierre fijo, y acciones de inventario móvil de ancho completo en una paleta clara integrada con la app.
 
@@ -106,6 +108,30 @@ Las fechas de los informes usan un calendario con el estilo de la aplicación en
 
 ---
 
+## 🔐 Acceso, Usuarios y Roles
+
+La aplicación **exige iniciar sesión** para usarse: sin una sesión válida solo se ve la pantalla de ingreso.
+
+| Rol | Qué ve |
+| :--- | :--- |
+| `usuario` (**Maquilladora**) | Resumen, Registrar Servicio, Informes & Edición y Mis Productos. |
+| `admin` (**Administrador**) | Todo lo anterior **+ Configuración** (usuarios, accesos y contraseña propia). |
+
+- **Contraseñas:** se guardan como hash **PBKDF2-HMAC-SHA256** con *salt* propio (200 000 iteraciones, `hashlib` de la librería estándar; nunca en texto plano y nunca se devuelven por la API).
+- **Sesiones:** token aleatorio (`secrets.token_urlsafe`) guardado en la tabla `sesiones`, válido **30 días**. Al cerrar sesión se borra; al cambiar la contraseña o desactivar la cuenta se invalidan las sesiones abiertas de ese usuario.
+- **El token se envía en la cabecera** `Authorization: Bearer <token>`. La interfaz lo guarda en el navegador, así que la sesión se mantiene al recargar o cerrar la app (PWA).
+- **Protección de la API:** todo endpoint (menos `/health` y `/auth/login`) responde `401` sin sesión. El **bot de Telegram** es un cliente máquina a máquina: se identifica con la cabecera `X-Internal-Key` (`INTERNAL_API_KEY`).
+- **Reglas de integridad:** no se puede eliminar ni desactivar el propio usuario, y siempre debe quedar **al menos un administrador activo**.
+- **Administrador inicial:** se crea automáticamente en el primer arranque con el usuario `ADMIN_USERNAME` (por defecto `admin`) y la contraseña de `ADMIN_PASSWORD`. Si `ADMIN_PASSWORD` no está definida, se genera una aleatoria y se imprime **una sola vez** en el log del backend.
+
+Variables en `backend/.env` (archivo **no versionado**, sobrevive a los despliegues):
+
+    ADMIN_USERNAME=admin
+    ADMIN_PASSWORD=<clave_del_administrador>
+    INTERNAL_API_KEY=<clave_de_servicio_del_bot>
+
+---
+
 ## 📂 Estructura del Repositorio
 
 ```text
@@ -113,7 +139,7 @@ salon-app/
 ├── backend/
 │   ├── Dockerfile           # Imagen Docker para el backend FastAPI
 │   ├── main.py              # API REST, endpoints, modelos Pydantic y lógica de SQLite
-│   ├── .env                 # Bot de Telegram + Ollama (NO se versiona; sobrevive a los despliegues)
+│   ├── .env                 # Bot, Ollama, ADMIN_PASSWORD e INTERNAL_API_KEY (NO se versiona)
 │   └── requirements.txt     # Dependencias de Python (FastAPI, Uvicorn, Pydantic)
 ├── data/
 │   └── salon.db             # Base de datos SQLite (persistida en volumen, datos reales)
@@ -133,6 +159,7 @@ salon-app/
 │       ├── App.jsx          # Aplicación completa: estado, vistas, modales y componentes
 │       ├── main.jsx         # Punto de entrada de React
 │       └── index.css        # Tokens de diseño, gradientes y animaciones (incl. .glow-rose)
+├── .env                     # TUNNEL_TOKEN del túnel de Cloudflare (NO se versiona)
 ├── docker-compose.yml       # Orquestación: frontend + backend + túnel
 ├── Agent.md                 # Guía técnica para agentes/desarrollo (reglas y pitfalls)
 └── README.md                # Documentación del proyecto
@@ -175,7 +202,8 @@ Asegúrate de tener instalados **Docker** y **Docker Compose**.
   ```
   El `frontend/Dockerfile` hace `npm install` + `npm run build` **dentro** del contenedor (el host no tiene Node).
 - **Reconstruir todo:** `docker-compose up -d --build` en `/opt/salon-app`.
-- `backend/.env` no se versiona y sobrevive a los despliegues; `data/` monta la base de datos real (no borrarla).
+- `backend/.env` (bot, Ollama, `ADMIN_PASSWORD`, `INTERNAL_API_KEY`) y el `.env` de la raíz (`TUNNEL_TOKEN`) **no se versionan** y sobreviven a los despliegues; `data/` monta la base de datos real (no borrarla).
+- **Al tocar el backend** (`main.py`) hay que reconstruir el contenedor: `docker-compose up -d --build backend`; el `init_db()` del arranque crea las tablas `usuarios`/`sesiones` y el administrador inicial si faltan (no borra ni migra datos existentes).
 - **Caché:** `nginx` sirve el `index.html` con `no-cache` y los `/assets` (con hash) como inmutables; el service worker sirve el **documento con estrategia red-primero**, así que tras un despliegue basta **un** refresco (dos la primera vez si el navegador venía de la versión anterior del service worker). En el móvil instalado como PWA, ciérrala y ábrela de nuevo si no ves los cambios.
 
 ### Opción 2: Ejecución Local en Entorno de Desarrollo
@@ -203,6 +231,27 @@ La aplicación se abrirá en `http://localhost:5173` (Vite consume la API en `ht
 ## 🔌 Endpoints de la API REST
 
 Todos se sirven bajo el prefijo `/api` a través de NGINX (Swagger en `:8000/docs`).
+
+**Salvo `/health` y `/auth/login`, todos exigen sesión** (`Authorization: Bearer <token>`) o la clave de servicio del bot (`X-Internal-Key`); sin ellas responden `401` y, si la sesión no es de un administrador, los endpoints de usuarios responden `403`.
+
+### Autenticación
+
+| Método | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Estado del servicio (público). |
+| `POST` | `/auth/login` | Inicia sesión `{username, password}` y devuelve `{token, expira_en, usuario}`. |
+| `POST` | `/auth/logout` | Cierra la sesión actual (borra el token). |
+| `GET` | `/auth/me` | Usuario de la sesión actual. |
+| `POST` | `/auth/cambiar-clave` | Cambia la contraseña propia `{password_actual, password_nueva}`. |
+
+### Usuarios (solo administrador)
+
+| Método | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/usuarios` | Lista los usuarios (sin hash ni salt). |
+| `POST` | `/usuarios` | Crea un usuario `{username, nombre, password, rol}`; `rol` = `usuario` o `admin`. |
+| `PATCH` | `/usuarios/{id}` | Actualiza nombre, rol, estado (`activo`) o contraseña. |
+| `DELETE` | `/usuarios/{id}` | Elimina un usuario (no a uno mismo ni al último administrador). |
 
 ### Servicios
 
@@ -247,6 +296,7 @@ Configuración en `backend/.env`:
 
     TELEGRAM_BOT_TOKEN=<token_del_bot>
     BACKEND_URL=http://localhost:8000
+    INTERNAL_API_KEY=<clave_de_servicio_del_bot>   # cabecera X-Internal-Key con la que el bot llama a la API
     OLLAMA_URL=http://172.17.0.1:11434
     OLLAMA_MODEL=hermes3
     OLLAMA_TIMEOUT=60
@@ -281,6 +331,19 @@ Módulo con:
 ---
 
 ## 🆕 Cambios recientes
+
+**Acceso, roles y sección Configuración (nuevo)**
+
+- **Pantalla de ingreso** con el estilo de la marca (fondo berry, tarjeta blanca, campos `field-uniform` y botón con degradado rosa). Sin sesión válida no se ve la aplicación.
+- **Dos niveles de acceso:** la maquilladora conserva exactamente las secciones de siempre; el administrador ve además **Configuración** (barra lateral de escritorio y barra inferior del móvil, que pasa a 4 elementos).
+- **Configuración:** crear usuario (nombre, usuario, contraseña y nivel de acceso), lista de usuarios con rol/estado/último ingreso, cambio de rol, restablecer contraseña, activar/desactivar y eliminar; cambio de la contraseña propia y cierre de sesión. Sobre la propia cuenta no se ofrecen desactivar ni eliminar.
+- **Sesión persistente** de 30 días: se mantiene al recargar o al reabrir la PWA. En móvil, quien no es administrador tiene **Salir** en la barra inferior; el administrador lo tiene en Configuración y en el pie de la barra lateral.
+- **La API queda cerrada** salvo `/health` y `/auth/login`; el bot de Telegram usa la cabecera `X-Internal-Key`.
+
+**Seguridad del repositorio**
+
+- El token del túnel de Cloudflare (`TUNNEL_TOKEN`) **ya no vive en `docker-compose.yml`**: se lee del archivo `.env` de la raíz, que está ignorado por git. Lo mismo para la contraseña del administrador y la clave del bot, que viven en `backend/.env`.
+- **Ningún despliegue debe versionar credenciales**: `.gitignore` cubre `.env`, `*.db`, `backups/`, `node_modules/` y `dist/`. Antes de publicar, comprueba `git grep -iE 'token=|password=|secret=' -- $(git rev-list --all) | wc -l`.
 
 **Interfaz móvil (barra superior y acciones)**
 

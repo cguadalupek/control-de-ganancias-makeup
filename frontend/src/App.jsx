@@ -38,12 +38,45 @@ import {
   Tag,
   ShoppingBag,
   Edit3,
-  Save
+  Save,
+  Lock,
+  LogOut,
+  Settings,
+  User,
+  UserPlus,
+  Users,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
   ? 'http://localhost:8000'
   : '/api';
+
+// Claves de almacenamiento local de la sesión
+const TOKEN_KEY = 'salon_token';
+const USER_KEY = 'salon_usuario';
+
+// Rol con acceso a la sección Configuración
+const ROL_ADMIN = 'admin';
+
+// Mensaje legible de un error de la API (FastAPI puede devolver detail como lista)
+const apiErrorMsg = (data, fallback) => {
+  const d = data && data.detail;
+  if (Array.isArray(d)) return d[0] && d[0].msg ? d[0].msg : fallback;
+  return typeof d === 'string' && d ? d : fallback;
+};
+
+// Fecha/hora legible para la lista de usuarios ("2026-10-18 23:27:07" -> "18/10/2026 23:27")
+const fechaCorta = (iso) => {
+  if (!iso) return '';
+  const [fecha, hora] = String(iso).split(' ');
+  const [y, m, d] = (fecha || '').split('-');
+  if (!y || !m || !d) return String(iso);
+  return `${d}/${m}/${y}${hora ? ' ' + hora.slice(0, 5) : ''}`;
+};
 
 const DEFAULT_GOAL = 480.00;
 
@@ -383,11 +416,839 @@ function BrandDateField({ ariaLabel = 'Elegir fecha', align = 'left', value, onC
   );
 }
 
+// ================= PANTALLA DE INGRESO =================
+// Mismo lenguaje visual de la app: fondo berry, tarjeta blanca de marca y campos
+// con la altura uniforme del resto de formularios (field-uniform).
+function LoginScreen({ onLogin, checking }) {
+  const [usuario, setUsuario] = useState('');
+  const [clave, setClave] = useState('');
+  const [verClave, setVerClave] = useState(false);
+  const [error, setError] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    if (enviando) return;
+    setError('');
+    setEnviando(true);
+    const res = await onLogin(usuario.trim(), clave);
+    if (res && res.error) setError(res.error);
+    setEnviando(false);
+  };
+
+  const inputBase = 'field-uniform w-full border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]';
+  const labelBase = 'text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5';
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#b64a83] via-[#9d3f6f] to-[#6f2b4c] relative overflow-hidden antialiased">
+      <div className="pointer-events-none absolute -top-24 -right-16 w-72 h-72 rounded-full bg-[#ec71a8]/35 blur-3xl"></div>
+      <div className="pointer-events-none absolute -bottom-28 -left-20 w-80 h-80 rounded-full bg-[#eec9a3]/25 blur-3xl"></div>
+
+      <div className="relative w-full max-w-sm">
+        <div className="flex justify-center mb-5">
+          <BrandLogo onDark />
+        </div>
+
+        <div className="bg-white rounded-3xl border border-[#f9cee3] shadow-2xl shadow-black/25 p-6 sm:p-7 animate-modal">
+          <div className="flex items-center gap-3 pb-5 mb-5 border-b border-[#fce3ed]">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold text-[#1e1e1c] leading-tight">Iniciar sesión</h1>
+              <p className="text-[11px] font-semibold text-[#8c8884]">Control de Ganancias y Servicios</p>
+            </div>
+          </div>
+
+          {checking ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <span className="w-8 h-8 rounded-full border-2 border-[#fce3ed] border-t-[#ec71a8] animate-spin"></span>
+              <span className="text-xs font-bold text-[#8c8884]">Verificando sesión…</span>
+            </div>
+          ) : (
+            <form onSubmit={enviar} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="login-usuario" className={labelBase}>
+                  <User className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Usuario
+                </label>
+                <input
+                  id="login-usuario"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={usuario}
+                  onChange={(e) => { setUsuario(e.target.value); setError(''); }}
+                  placeholder="Tu usuario"
+                  className={`${inputBase} px-3.5`}
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="login-clave" className={labelBase}>
+                  <Lock className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    id="login-clave"
+                    type={verClave ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={clave}
+                    onChange={(e) => { setClave(e.target.value); setError(''); }}
+                    placeholder="Tu contraseña"
+                    className={`${inputBase} pl-3.5 pr-12`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerClave(!verClave)}
+                    aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-[#8c8884] hover:bg-[#fce3ed] hover:text-[#b64a83] cursor-pointer"
+                  >
+                    {verClave ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div role="alert" className="flex items-start gap-2 px-3.5 py-3 rounded-2xl bg-[#fdeef4] border border-[#ec71a8]/35 text-[#933a69]">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="text-xs font-bold leading-snug">{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={enviando}
+                className="mt-1 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-sm shadow-md shadow-[#ec71a8]/30 hover:opacity-95 active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {enviando ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin"></span>
+                    Ingresando…
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    Ingresar
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="mt-4 text-center text-[11px] font-semibold text-white/70">
+          Rodríguez Make Up · Estudio
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ================= SECCIÓN CONFIGURACIÓN (solo administrador) =================
+// Alta de usuarios (maquilladora / administrador), control de accesos, cambio de
+// contraseña propia y cierre de sesión. Mismo lenguaje visual que el resto de la app.
+function ConfiguracionPanel({
+  usuario, usuarios, cargando, onCrear, onActualizar, onEliminar, onRecargar, onCerrarSesion, onCambiarClave
+}) {
+  const [nombre, setNombre] = useState('');
+  const [username, setUsername] = useState('');
+  const [clave, setClave] = useState('');
+  const [rol, setRol] = useState('usuario');
+  const [verClave, setVerClave] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [error, setError] = useState('');
+
+  const [resetUsuario, setResetUsuario] = useState(null);
+  const [resetClave, setResetClave] = useState('');
+  const [verReset, setVerReset] = useState(false);
+  const [guardandoReset, setGuardandoReset] = useState(false);
+  const [errorReset, setErrorReset] = useState('');
+
+  const [claveActual, setClaveActual] = useState('');
+  const [claveNueva, setClaveNueva] = useState('');
+  const [verClaveActual, setVerClaveActual] = useState(false);
+  const [verClaveNueva, setVerClaveNueva] = useState(false);
+  const [guardandoMiClave, setGuardandoMiClave] = useState(false);
+  const [errorMiClave, setErrorMiClave] = useState('');
+
+  const rolOptions = [
+    { value: 'usuario', label: 'Maquilladora', desc: 'Resumen, Productos e Informes' },
+    { value: 'admin', label: 'Administrador', desc: 'Todo lo anterior + Configuración' },
+  ];
+  const etiquetaRol = (r) => (r === 'admin' ? 'Administrador' : 'Maquilladora');
+
+  const inputBase = 'field-uniform w-full border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]';
+  const labelBase = 'text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5';
+  const btnMini = 'px-3 py-2 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors';
+  const alerta = 'flex items-start gap-2 px-3.5 py-3 rounded-2xl bg-[#fdeef4] border border-[#ec71a8]/35 text-[#933a69]';
+
+  const enviarAlta = async (e) => {
+    e.preventDefault();
+    setError('');
+    setCreando(true);
+    const res = await onCrear({ username: username.trim(), nombre: nombre.trim(), password: clave, rol });
+    setCreando(false);
+    if (res && res.error) { setError(res.error); return; }
+    setNombre(''); setUsername(''); setClave(''); setRol('usuario');
+  };
+
+  const abrirReset = (u) => {
+    setResetUsuario(u); setResetClave(''); setErrorReset(''); setVerReset(false);
+  };
+
+  const enviarReset = async (e) => {
+    e.preventDefault();
+    if (!resetUsuario) return;
+    setErrorReset('');
+    setGuardandoReset(true);
+    const res = await onActualizar(resetUsuario.id, { password: resetClave });
+    setGuardandoReset(false);
+    if (res && res.error) { setErrorReset(res.error); return; }
+    setResetUsuario(null); setResetClave('');
+  };
+
+  const enviarMiClave = async (e) => {
+    e.preventDefault();
+    setErrorMiClave('');
+    setGuardandoMiClave(true);
+    const res = await onCambiarClave({ actual: claveActual, nueva: claveNueva });
+    setGuardandoMiClave(false);
+    if (res && res.error) { setErrorMiClave(res.error); return; }
+    setClaveActual(''); setClaveNueva('');
+  };
+
+  const ojo = (visible, toggle, etiqueta) => (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={etiqueta}
+      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-[#8c8884] hover:bg-[#fce3ed] hover:text-[#b64a83] cursor-pointer"
+    >
+      {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-300">
+
+      {/* ---------- ALTA DE USUARIO ---------- */}
+      <section className="card-luxury rounded-3xl p-5 sm:p-6">
+        <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#fce3ed]">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shrink-0">
+            <UserPlus className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] leading-tight">Crear usuario</h3>
+            <p className="text-[11px] font-semibold text-[#8c8884]">
+              La maquilladora mantiene las secciones habituales; el administrador ve además Configuración
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={enviarAlta} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cfg-nombre" className={labelBase}>
+              <User className="w-3.5 h-3.5 text-[#ec71a8]" />
+              Nombre completo
+            </label>
+            <input
+              id="cfg-nombre"
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej. Guadalupe Rodríguez"
+              className={`${inputBase} px-3.5`}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cfg-usuario" className={labelBase}>
+              <Users className="w-3.5 h-3.5 text-[#ec71a8]" />
+              Usuario
+            </label>
+            <input
+              id="cfg-usuario"
+              type="text"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Ej. guadalupe"
+              className={`${inputBase} px-3.5`}
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cfg-clave" className={labelBase}>
+              <KeyRound className="w-3.5 h-3.5 text-[#ec71a8]" />
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                id="cfg-clave"
+                type={verClave ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className={`${inputBase} pl-3.5 pr-12`}
+                required
+                minLength={6}
+              />
+              {ojo(verClave, () => setVerClave(!verClave), verClave ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className={labelBase}>
+              <ShieldCheck className="w-3.5 h-3.5 text-[#ec71a8]" />
+              Nivel de acceso
+            </label>
+            <BrandSelect value={rol} onChange={setRol} options={rolOptions} placeholder="Elige el nivel" icon={ShieldCheck} />
+          </div>
+
+          {error && (
+            <div role="alert" className={`${alerta} sm:col-span-2`}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="text-xs font-bold leading-snug">{error}</span>
+            </div>
+          )}
+
+          <div className="sm:col-span-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={creando}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-sm shadow-md shadow-[#ec71a8]/25 hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+            >
+              {creando
+                ? <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin"></span>
+                : <UserPlus className="w-4 h-4" />}
+              {creando ? 'Creando…' : 'Crear usuario'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ---------- USUARIOS REGISTRADOS ---------- */}
+      <section className="card-luxury rounded-3xl p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3 pb-4 mb-5 border-b border-[#fce3ed]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#fce3ed] text-[#b64a83] flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] leading-tight">Usuarios registrados</h3>
+              <p className="text-[11px] font-semibold text-[#8c8884]">
+                {usuarios.length} {usuarios.length === 1 ? 'usuario' : 'usuarios'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onRecargar}
+            disabled={cargando}
+            className="shrink-0 px-3.5 py-2.5 rounded-2xl border border-[#f9cee3] bg-[#faf5f8] text-[#b64a83] text-[11px] font-bold flex items-center gap-1.5 hover:bg-[#fce3ed] disabled:opacity-60 cursor-pointer"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${cargando ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        </div>
+
+        {cargando && usuarios.length === 0 ? (
+          <div className="flex items-center justify-center gap-3 py-8 text-xs font-bold text-[#8c8884]">
+            <span className="w-6 h-6 rounded-full border-2 border-[#fce3ed] border-t-[#ec71a8] animate-spin"></span>
+            Cargando usuarios…
+          </div>
+        ) : usuarios.length === 0 ? (
+          <p className="text-xs font-semibold text-[#8c8884] py-6 text-center">Todavía no hay usuarios registrados.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {usuarios.map((u) => (
+              <article
+                key={u.id}
+                className="rounded-2xl border border-[#fce3ed] bg-white p-3.5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                    u.rol === 'admin' ? 'bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white' : 'bg-[#fce3ed] text-[#b64a83]'
+                  }`}>
+                    {u.rol === 'admin' ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-sm text-[#1e1e1c] truncate">{u.nombre || u.username}</span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        u.rol === 'admin'
+                          ? 'bg-[#fce3ed] text-[#933a69] border-[#ec71a8]/30'
+                          : 'bg-[#faf5f8] text-[#6b6764] border-[#e5e1da]'
+                      }`}>
+                        {etiquetaRol(u.rol)}
+                      </span>
+                      {!u.activo && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-[#fdeef4] text-[#933a69] border border-[#ec71a8]/30">
+                          Desactivado
+                        </span>
+                      )}
+                      {usuario && u.id === usuario.id && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-[#ecc880]/20 text-[#8a5a3e] border border-[#ecc880]/40">
+                          Tú
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-semibold text-[#8c8884] block truncate">
+                      @{u.username}{u.ultimo_acceso ? ` · último ingreso ${fechaCorta(u.ultimo_acceso)}` : ' · sin ingresos'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center shrink-0">
+                  <div className="w-full lg:w-44">
+                    <BrandSelect
+                      value={u.rol}
+                      onChange={(v) => onActualizar(u.id, { rol: v })}
+                      options={rolOptions}
+                      placeholder="Nivel"
+                      icon={ShieldCheck}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => abrirReset(u)}
+                      className={`${btnMini} border-[#f9cee3] bg-[#faf5f8] text-[#b64a83] hover:bg-[#fce3ed]`}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      Clave
+                    </button>
+                    {/* Sobre tu propia cuenta no se ofrecen desactivar ni eliminar */}
+                    {!(usuario && u.id === usuario.id) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onActualizar(u.id, { activo: !u.activo })}
+                          className={`${btnMini} ${
+                            u.activo
+                              ? 'border-[#e5e1da] bg-white text-[#6b6764] hover:bg-[#faf5f8]'
+                              : 'border-[#ec71a8]/40 bg-[#fdeef4] text-[#933a69] hover:bg-[#fce3ed]'
+                          }`}
+                        >
+                          {u.activo ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          {u.activo ? 'Desactivar' : 'Activar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onEliminar(u)}
+                          className={`${btnMini} border-[#ec71a8]/40 bg-[#fdeef4] text-[#933a69] hover:bg-[#fce3ed]`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Eliminar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ---------- MI CUENTA ---------- */}
+      <section className="card-luxury rounded-3xl p-5 sm:p-6">
+        <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#fce3ed]">
+          <div className="w-11 h-11 rounded-2xl bg-[#2a1a25] text-[#ecc880] flex items-center justify-center shadow-md shrink-0">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c] leading-tight">Mi cuenta</h3>
+            <p className="text-[11px] font-semibold text-[#8c8884]">Contraseña propia y cierre de sesión</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#fce3ed] bg-[#faf5f8] p-3.5">
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <span className="block font-extrabold text-sm text-[#1e1e1c] truncate">
+                {usuario ? (usuario.nombre || usuario.username) : ''}
+              </span>
+              <span className="block text-[11px] font-semibold text-[#8c8884] truncate">
+                @{usuario ? usuario.username : ''} · Administrador
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={enviarMiClave} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="cfg-actual" className={labelBase}>
+                <Lock className="w-3.5 h-3.5 text-[#ec71a8]" />
+                Contraseña actual
+              </label>
+              <div className="relative">
+                <input
+                  id="cfg-actual"
+                  type={verClaveActual ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={claveActual}
+                  onChange={(e) => setClaveActual(e.target.value)}
+                  placeholder="Tu contraseña actual"
+                  className={`${inputBase} pl-3.5 pr-12`}
+                  required
+                />
+                {ojo(verClaveActual, () => setVerClaveActual(!verClaveActual), verClaveActual ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="cfg-nueva" className={labelBase}>
+                <KeyRound className="w-3.5 h-3.5 text-[#ec71a8]" />
+                Contraseña nueva
+              </label>
+              <div className="relative">
+                <input
+                  id="cfg-nueva"
+                  type={verClaveNueva ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={claveNueva}
+                  onChange={(e) => setClaveNueva(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className={`${inputBase} pl-3.5 pr-12`}
+                  required
+                  minLength={6}
+                />
+                {ojo(verClaveNueva, () => setVerClaveNueva(!verClaveNueva), verClaveNueva ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+              </div>
+            </div>
+
+            {errorMiClave && (
+              <div role="alert" className={`${alerta} sm:col-span-2`}>
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="text-xs font-bold leading-snug">{errorMiClave}</span>
+              </div>
+            )}
+
+            <div className="sm:col-span-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={guardandoMiClave}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-sm shadow-md shadow-[#ec71a8]/25 hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {guardandoMiClave ? 'Guardando…' : 'Cambiar contraseña'}
+              </button>
+            </div>
+          </form>
+
+          <div className="pt-4 border-t border-[#fce3ed]">
+            <button
+              type="button"
+              onClick={onCerrarSesion}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-[#ec71a8]/45 bg-[#fdeef4] text-[#933a69] font-extrabold text-sm hover:bg-[#fce3ed] cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- MODAL: RESTABLECER CONTRASEÑA ---------- */}
+      {resetUsuario && (
+        <div className="fixed inset-0 z-[85] bg-[#1e1e1c]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#f9cee3] animate-modal">
+            <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#1e1e1c]">Restablecer contraseña</h3>
+                  <p className="text-[11px] font-semibold text-[#8c8884]">
+                    @{resetUsuario.username} · {etiquetaRol(resetUsuario.rol)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetUsuario(null)}
+                className="p-2 rounded-xl text-[#8c8884] hover:bg-[#fce3ed] hover:text-[#1e1e1c] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={enviarReset} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cfg-reset" className={labelBase}>
+                  <KeyRound className="w-3.5 h-3.5 text-[#ec71a8]" />
+                  Nueva contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    id="cfg-reset"
+                    type={verReset ? 'text' : 'password'}
+                    value={resetClave}
+                    onChange={(e) => setResetClave(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className={`${inputBase} pl-3.5 pr-12`}
+                    required
+                    minLength={6}
+                  />
+                  {ojo(verReset, () => setVerReset(!verReset), verReset ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+                </div>
+                <span className="text-[10px] font-semibold text-[#8c8884]">
+                  Al cambiarla se cerrarán las sesiones abiertas de ese usuario.
+                </span>
+              </div>
+
+              {errorReset && (
+                <div role="alert" className={alerta}>
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="text-xs font-bold leading-snug">{errorReset}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#fce3ed]">
+                <button
+                  type="button"
+                  onClick={() => setResetUsuario(null)}
+                  className="px-5 py-2.5 rounded-2xl border border-[#e5e1da] bg-white hover:bg-[#faf5f8] font-bold text-xs text-[#6b6764] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoReset}
+                  className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-xs shadow-md shadow-[#ec71a8]/25 hover:opacity-95 disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  {guardandoReset ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
-  // Navegación por pestañas ('resumen' | 'productos' | 'informes')
+  // Navegación por pestañas ('resumen' | 'productos' | 'informes' | 'configuracion')
   // El registro de servicio y el de producto se abren como ventanas modales superpuestas
   const [activeTab, setActiveTab] = useState('resumen');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // ============================================================
+  // SESIÓN / AUTENTICACIÓN
+  // ============================================================
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem(TOKEN_KEY) || '');
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    } catch (e) {
+      return null;
+    }
+  });
+  const [authChecking, setAuthChecking] = useState(Boolean(localStorage.getItem(TOKEN_KEY)));
+  const [usuarios, setUsuarios] = useState([]);
+  const [usuariosCargando, setUsuariosCargando] = useState(false);
+
+  const esAdmin = Boolean(currentUser && currentUser.rol === ROL_ADMIN);
+
+  // Cierra la sesión solo en el cliente (sin llamar al backend)
+  const limpiarSesionLocal = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    setAuthToken('');
+    setCurrentUser(null);
+    setUsuarios([]);
+  };
+
+  // fetch con la cabecera de sesión; si el token caduca se vuelve al login
+  const apiFetch = React.useCallback(async (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (authToken) headers.Authorization = `Bearer ${authToken}`;
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 && authToken && !String(url).includes('/auth/login')) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      setAuthToken('');
+      setCurrentUser(null);
+      setUsuarios([]);
+    }
+    return res;
+  }, [authToken]);
+
+  const handleLogin = async (username, password) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: apiErrorMsg(data, 'No se pudo iniciar sesión') };
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.usuario));
+      setAuthToken(data.token);
+      setCurrentUser(data.usuario);
+      setActiveTab('resumen');
+      // Los montos del Resumen vuelven a animarse al entrar
+      setAnimateCounters(true);
+      setTimeout(() => setAnimateCounters(false), 1500);
+      return { ok: true };
+    } catch (e) {
+      return { error: 'No hay conexión con el servidor. Inténtalo de nuevo.' };
+    }
+  };
+
+  const handleLogout = async () => {
+    if (!window.confirm('¿Cerrar sesión?')) return;
+    try {
+      await apiFetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+    } catch (e) {
+      // aunque falle la llamada, la sesión local se cierra igual
+    }
+    limpiarSesionLocal();
+    setActiveTab('resumen');
+    setMobileMenuOpen(false);
+  };
+
+  // Validar el token guardado al abrir la app (mantiene la sesión entre visitas)
+  useEffect(() => {
+    if (!authToken) {
+      setAuthChecking(false);
+      return undefined;
+    }
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/auth/me`);
+        if (!cancelado && res.ok) {
+          const data = await res.json();
+          setCurrentUser(data.usuario);
+          localStorage.setItem(USER_KEY, JSON.stringify(data.usuario));
+        }
+      } catch (e) {
+        // sin conexión: se mantiene el usuario cacheado en localStorage
+      }
+      if (!cancelado) setAuthChecking(false);
+    })();
+    return () => { cancelado = true; };
+  }, [authToken]);
+
+  // Un usuario sin rol admin nunca puede quedarse en la sección Configuración
+  useEffect(() => {
+    if (!esAdmin && activeTab === 'configuracion') setActiveTab('resumen');
+  }, [esAdmin, activeTab]);
+
+  // ============================================================
+  // GESTIÓN DE USUARIOS (sección Configuración)
+  // ============================================================
+  const cargarUsuarios = async () => {
+    if (!esAdmin) return;
+    setUsuariosCargando(true);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/usuarios`);
+      if (res.ok) {
+        const data = await res.json();
+        setUsuarios(Array.isArray(data) ? data : []);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(apiErrorMsg(data, 'No se pudo cargar la lista de usuarios'), 'error');
+      }
+    } catch (e) {
+      showToast('No hay conexión con el servidor', 'error');
+    }
+    setUsuariosCargando(false);
+  };
+
+  useEffect(() => {
+    if (esAdmin && activeTab === 'configuracion') cargarUsuarios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAdmin, activeTab]);
+
+  const crearUsuario = async (datos) => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/usuarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: apiErrorMsg(data, 'No se pudo crear el usuario') };
+      showToast(`Usuario @${data.username} creado`);
+      await cargarUsuarios();
+      return { ok: true };
+    } catch (e) {
+      return { error: 'No hay conexión con el servidor' };
+    }
+  };
+
+  const actualizarUsuario = async (id, cambios) => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/usuarios/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cambios),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = apiErrorMsg(data, 'No se pudo actualizar el usuario');
+        showToast(msg, 'error');
+        return { error: msg };
+      }
+      showToast('Usuario actualizado');
+      await cargarUsuarios();
+      return { ok: true };
+    } catch (e) {
+      return { error: 'No hay conexión con el servidor' };
+    }
+  };
+
+  const eliminarUsuario = async (u) => {
+    if (!u) return { error: '' };
+    if (!window.confirm(`¿Eliminar definitivamente al usuario @${u.username}?`)) return { error: '' };
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/usuarios/${u.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = apiErrorMsg(data, 'No se pudo eliminar el usuario');
+        showToast(msg, 'error');
+        return { error: msg };
+      }
+      showToast(`Usuario @${u.username} eliminado`);
+      await cargarUsuarios();
+      return { ok: true };
+    } catch (e) {
+      return { error: 'No hay conexión con el servidor' };
+    }
+  };
+
+  const cambiarClavePropia = async ({ actual, nueva }) => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/auth/cambiar-clave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password_actual: actual, password_nueva: nueva }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: apiErrorMsg(data, 'No se pudo cambiar la contraseña') };
+      showToast('Contraseña actualizada');
+      return { ok: true };
+    } catch (e) {
+      return { error: 'No hay conexión con el servidor' };
+    }
+  };
 
   // Lista de servicios registrados
   const [services, setServices] = useState(() => {
@@ -502,11 +1363,12 @@ export default function App() {
   const [filterSalon, setFilterSalon] = useState('todos'); // 'todos' | id del salón
   const [quickRange, setQuickRange] = useState('all'); // preselección del dropdown de rango
 
-  // Cargar servicios desde backend
+  // Cargar servicios desde backend (solo con sesión iniciada)
   useEffect(() => {
+    if (!authToken) return undefined;
     const fetchServices = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/servicios`);
+        const res = await apiFetch(`${API_BASE_URL}/servicios`);
         if (res.ok) {
           const data = await res.json();
           if (data.servicios && data.servicios.length > 0) {
@@ -519,23 +1381,24 @@ export default function App() {
       }
     };
     fetchServices();
-  }, []);
+  }, [authToken]);
 
-  // Cargar salones / estudios
+  // Cargar salones / estudios (solo con sesión iniciada)
   useEffect(() => {
-    fetch(`${API_BASE_URL}/salones`)
+    if (!authToken) return undefined;
+    apiFetch(`${API_BASE_URL}/salones`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setSalones(Array.isArray(data) ? data : []))
       .catch(() => console.log('No se pudieron cargar los salones'));
-  }, []);
+  }, [authToken]);
 
   // Cargar productos cuando se activa la pestaña "productos"
   useEffect(() => {
-    if (activeTab === 'productos') {
+    if (authToken && activeTab === 'productos') {
       fetchProducts(productSearch, productStatusFilter);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, productStatusFilter]);
+  }, [authToken, activeTab, productStatusFilter]);
 
   // Guardar en localStorage
   useEffect(() => {
@@ -658,7 +1521,7 @@ export default function App() {
     let creado = buildLocal(item);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/registro`, {
+      const res = await apiFetch(`${API_BASE_URL}/registro`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -730,7 +1593,7 @@ export default function App() {
     };
 
     try {
-      await fetch(`${API_BASE_URL}/registro/${editingService.id}`, {
+      await apiFetch(`${API_BASE_URL}/registro/${editingService.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -755,7 +1618,7 @@ export default function App() {
     if (!window.confirm('¿Estás seguro de eliminar este registro de servicio?')) return;
 
     try {
-      await fetch(`${API_BASE_URL}/registro/${id}`, { method: 'DELETE' });
+      await apiFetch(`${API_BASE_URL}/registro/${id}`, { method: 'DELETE' });
     } catch (err) {
       console.log('Eliminando localmente');
     }
@@ -775,7 +1638,7 @@ export default function App() {
       if (status && status !== 'todos') params.set('status', status);
       const qs = params.toString();
       const url = qs ? `${API_BASE_URL}/products?${qs}` : `${API_BASE_URL}/products`;
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
         setProducts(data.products || []);
@@ -803,7 +1666,7 @@ export default function App() {
       expiration_date: prodExpirationDate,
     };
     try {
-      const res = await fetch(`${API_BASE_URL}/products`, {
+      const res = await apiFetch(`${API_BASE_URL}/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -843,7 +1706,7 @@ export default function App() {
 
   const handleOpenToday = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${id}/open`, { method: 'PATCH' });
+      const res = await apiFetch(`${API_BASE_URL}/products/${id}/open`, { method: 'PATCH' });
       if (!res.ok) throw new Error('No se pudo abrir');
       const data = await res.json();
       showToast(data.message || 'Producto abierto hoy', 'success');
@@ -856,7 +1719,7 @@ export default function App() {
   const handleFinishProduct = async (id) => {
     if (!window.confirm('¿Marcar este producto como terminado/agotado?')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${id}/finish`, { method: 'PATCH' });
+      const res = await apiFetch(`${API_BASE_URL}/products/${id}/finish`, { method: 'PATCH' });
       if (!res.ok) throw new Error('No se pudo marcar como terminado');
       showToast('Producto marcado como terminado', 'success');
       await fetchProducts(productSearch, productStatusFilter);
@@ -867,7 +1730,7 @@ export default function App() {
 
   const handleReactivateProduct = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${id}/reactivate`, { method: 'PATCH' });
+      const res = await apiFetch(`${API_BASE_URL}/products/${id}/reactivate`, { method: 'PATCH' });
       if (!res.ok) throw new Error('No se pudo reactivar');
       showToast('Producto reactivado', 'success');
       await fetchProducts(productSearch, productStatusFilter);
@@ -879,7 +1742,7 @@ export default function App() {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('¿Eliminar este producto del inventario?')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('No se pudo eliminar');
       showToast('Producto eliminado', 'warning');
       await fetchProducts(productSearch, productStatusFilter);
@@ -912,7 +1775,7 @@ export default function App() {
       status: editProdStatus,
     };
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
+      const res = await apiFetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1279,6 +2142,11 @@ export default function App() {
 
   // Mini Calendario
 
+  // Sin sesión válida se muestra la pantalla de ingreso (mismo estilo de la app)
+  if (!currentUser) {
+    return <LoginScreen onLogin={handleLogin} checking={authChecking} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#faf5f8] text-[#1e1e1c] flex flex-col md:flex-row antialiased">
       
@@ -1399,11 +2267,56 @@ export default function App() {
               </div>
             </button>
 
+            {/* 5. CONFIGURACIÓN (solo administrador) */}
+            {esAdmin && (
+              <button
+                onClick={() => { setActiveTab('configuracion'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
+                  activeTab === 'configuracion'
+                    ? 'bg-white text-[#933a69] shadow-lg shadow-black/25 translate-x-1'
+                    : 'text-white/90 hover:bg-white/15 hover:text-white'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeTab === 'configuracion' ? 'bg-[#fce3ed] text-[#b64a83]' : 'bg-white/15 text-white'}`}>
+                  <Settings className="w-4 h-4" />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-extrabold">Configuración</span>
+                  <span className={`text-[11px] block font-medium ${activeTab === 'configuracion' ? 'text-[#933a69]/80' : 'text-white/70'}`}>
+                    Usuarios y accesos
+                  </span>
+                </div>
+              </button>
+            )}
+
           </nav>
         </div>
 
         {/* PIE DEL PANEL LATERAL */}
         <div className="hidden md:block pt-6 border-t border-white/20 mt-6">
+          {/* Usuario con sesión iniciada + cierre de sesión */}
+          <div className="flex items-center gap-3 pb-4">
+            <span className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 text-white flex items-center justify-center shrink-0">
+              {esAdmin ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm font-extrabold text-white truncate">
+                {currentUser ? (currentUser.nombre || currentUser.username) : ''}
+              </span>
+              <span className="block text-[11px] font-semibold text-white/70 truncate">
+                @{currentUser ? currentUser.username : ''} · {esAdmin ? 'Administrador' : 'Maquilladora'}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              className="p-2.5 rounded-xl bg-white/15 border border-white/25 text-white hover:bg-white/25 cursor-pointer shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+
           <div className="p-4 rounded-2xl bg-[#2a1a25]/85 border border-white/10 text-white relative overflow-hidden shadow-md">
             <div className="absolute top-0 right-0 w-24 h-24 bg-[#ec71a8]/30 rounded-full blur-xl"></div>
             <div className="flex items-center gap-2 text-[#ecc880] mb-1">
@@ -1465,6 +2378,7 @@ export default function App() {
           <span className="text-xs font-extrabold uppercase tracking-widest text-[#ec71a8] text-right">
             {activeTab === 'productos' && 'Mis Productos'}
             {activeTab === 'informes' && 'Informes'}
+            {activeTab === 'configuracion' && 'Configuración'}
           </span>
         )}
           {/* BOTON REGISTRAR: solo en Resumen, grande y con resplandor rosa */}
@@ -1493,6 +2407,7 @@ export default function App() {
             {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
             {activeTab === 'productos' && 'Registro y Control de Productos'}
             {activeTab === 'informes' && 'Historial, Edición e Informes'}
+            {activeTab === 'configuracion' && 'Configuración de Usuarios'}
           </h2>
 
           {activeTab === 'resumen' ? (
@@ -2445,6 +3360,21 @@ export default function App() {
           </section>
         )}
 
+        {/* ================= VISTA 4: CONFIGURACIÓN (SOLO ADMINISTRADOR) ================= */}
+        {esAdmin && activeTab === 'configuracion' && (
+          <ConfiguracionPanel
+            usuario={currentUser}
+            usuarios={usuarios}
+            cargando={usuariosCargando}
+            onCrear={crearUsuario}
+            onActualizar={actualizarUsuario}
+            onEliminar={eliminarUsuario}
+            onRecargar={cargarUsuarios}
+            onCerrarSesion={handleLogout}
+            onCambiarClave={cambiarClavePropia}
+          />
+        )}
+
 </main>
 
         {/* ================= MODAL: REGISTRAR SERVICIO (overlay + backdrop blur) ================= */}
@@ -2907,9 +3837,9 @@ export default function App() {
         )}
 
 
-      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas) ================= */}
+      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 secciones + Configuración / Salir) ================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-[#b64a83] via-[#a3416f] to-[#8f3663] backdrop-blur-md border-t border-white/15 shadow-[0_-6px_22px_rgba(147,58,105,0.35)] pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-3 items-end">
+        <div className="grid grid-cols-4 items-end">
           <button
             onClick={() => setActiveTab('resumen')}
             aria-label="Resumen general"
@@ -2937,6 +3867,27 @@ export default function App() {
             <span className="text-[10px] font-bold">Informes</span>
             <span className={`h-0.5 w-6 rounded-full ${activeTab === 'informes' ? 'bg-white' : 'bg-transparent'}`}></span>
           </button>
+          {esAdmin ? (
+            <button
+              onClick={() => setActiveTab('configuracion')}
+              aria-label="Configuración"
+              className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'configuracion' ? 'text-white' : 'text-white/55'}`}
+            >
+              <Settings className="w-5 h-5" />
+              <span className="text-[10px] font-bold">Ajustes</span>
+              <span className={`h-0.5 w-6 rounded-full ${activeTab === 'configuracion' ? 'bg-white' : 'bg-transparent'}`}></span>
+            </button>
+          ) : (
+            <button
+              onClick={handleLogout}
+              aria-label="Cerrar sesión"
+              className="flex flex-col items-center justify-center gap-1 py-2.5 transition-colors text-white/55 hover:text-white"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="text-[10px] font-bold">Salir</span>
+              <span className="h-0.5 w-6 rounded-full bg-transparent"></span>
+            </button>
+          )}
         </div>
       </nav>
 

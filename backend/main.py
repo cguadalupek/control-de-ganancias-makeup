@@ -1,13 +1,59 @@
 import datetime
+import hashlib
+import hmac
 import math
 import os
+import secrets
 import sqlite3
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Sistema Registro Salón")
+
+# ============================================================
+# CONTROL DE ACCESO
+# ============================================================
+# Todo endpoint exige una sesión de usuario válida (Authorization: Bearer <token>)
+# o la clave de servicio del bot (X-Internal-Key). Solo quedan abiertos el login y /health.
+RUTAS_PUBLICAS = {"/", "/health", "/auth/login"}
+
+# Este middleware se registra ANTES que CORS a propósito: así CORS queda por fuera
+# y las respuestas 401 también viajan con sus cabeceras.
+@app.middleware("http")
+async def control_acceso(request: Request, call_next):
+    ruta = request.url.path.rstrip("/") or "/"
+    if ruta in RUTAS_PUBLICAS or ruta.startswith("/docs") or ruta.startswith("/openapi"):
+        return await call_next(request)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    clave = request.headers.get("x-internal-key", "")
+    if INTERNAL_API_KEY and clave and hmac.compare_digest(clave, INTERNAL_API_KEY):
+        request.state.usuario = None
+        request.state.token = ""
+        request.state.cliente_interno = True
+        return await call_next(request)
+
+    cabecera = request.headers.get("authorization", "")
+    token = cabecera[7:].strip() if cabecera.lower().startswith("bearer ") else ""
+    fila = usuario_por_token(token)
+    if fila is None:
+        return JSONResponse(status_code=401, content={"detail": "Sesión no válida o expirada"})
+
+    request.state.usuario = _row_usuario_publico(fila)
+    request.state.token = token
+    request.state.cliente_interno = False
+    return await call_next(request)
+
+def require_admin(request: Request) -> dict:
+    """Dependencia: exige una sesión con rol administrador."""
+    usuario = getattr(request.state, "usuario", None)
+    if not usuario or usuario.get("rol") != ROL_ADMIN:
+        raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
+    return usuario
 
 # Configuración de CORS para permitir conexiones desde el Frontend
 app.add_middleware(
@@ -29,10 +75,95 @@ else:
 
 PROPIO_SALON_NOMBRE = "Rodriguez Makeup"  # entidad propia: sin comisión, 100% para la maquilladora
 
+# ============================================================
+# AUTENTICACIÓN, ROLES Y SESIONES
+# ============================================================
+# Roles:
+#   'usuario' -> maquilladora: ve Resumen, Productos e Informes.
+#   'admin'   -> además ve y administra la sección Configuración (usuarios).
+ROL_ADMIN = "admin"
+ROL_USUARIO = "usuario"
+ROLES_VALIDOS = (ROL_ADMIN, ROL_USUARIO)
+
+SESSION_DIAS = 30              # duración de la sesión (la app se usa a diario desde el móvil)
+PBKDF2_ITERACIONES = 200_000   # PBKDF2-HMAC-SHA256, sin dependencias externas
+MIN_PASSWORD = 6
+
+# Bootstrap del administrador: la contraseña NUNCA vive en el repositorio, se toma de
+# la variable de entorno ADMIN_PASSWORD (backend/.env, ignorado por git). Si no está
+# definida se genera una aleatoria y se imprime UNA vez en el log de arranque.
+ADMIN_USERNAME_INICIAL = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD_INICIAL = os.getenv("ADMIN_PASSWORD", "")
+
+# Clave de servicio para clientes internos (bot de Telegram). Se envía en la cabecera
+# X-Internal-Key y sustituye a la sesión de usuario en las llamadas máquina a máquina.
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+def _hash_password(password: str, salt: Optional[str] = None):
+    """Devuelve (salt, hash_hex) con PBKDF2-HMAC-SHA256. Sin dependencias externas."""
+    if not salt:
+        salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERACIONES)
+    return salt, dk.hex()
+
+def verificar_password(password: str, salt: str, hash_esperado: str) -> bool:
+    """Comparación en tiempo constante del hash almacenado."""
+    try:
+        _, calculado = _hash_password(password, salt)
+    except Exception:
+        return False
+    return hmac.compare_digest(calculado, hash_esperado or "")
+
+def _ahora_iso() -> str:
+    return datetime.datetime.now().replace(microsecond=0).isoformat(sep=" ")
+
+def _row_usuario_publico(r) -> dict:
+    """Vista pública de un usuario: nunca expone hash ni salt."""
+    return {
+        "id": r["id"],
+        "username": r["username"],
+        "nombre": r["nombre"] or "",
+        "rol": r["rol"],
+        "activo": bool(r["activo"]),
+        "creado_en": r["creado_en"],
+        "ultimo_acceso": r["ultimo_acceso"],
+    }
+
+def crear_sesion(usuario_id: int) -> dict:
+    """Crea un token de sesión y limpia las expiradas."""
+    token = secrets.token_urlsafe(32)
+    ahora = datetime.datetime.now().replace(microsecond=0)
+    expira = ahora + datetime.timedelta(days=SESSION_DIAS)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM sesiones WHERE expira_en < ?", (_ahora_iso(),))
+    cur.execute(
+        "INSERT INTO sesiones (token, usuario_id, creado_en, expira_en) VALUES (?, ?, ?, ?)",
+        (token, usuario_id, ahora.isoformat(sep=" "), expira.isoformat(sep=" ")),
+    )
+    conn.commit()
+    conn.close()
+    return {"token": token, "expira_en": expira.isoformat(sep=" ")}
+
+def usuario_por_token(token: str) -> Optional[sqlite3.Row]:
+    """Fila del usuario dueño de la sesión, o None si el token no es válido o caducó."""
+    if not token:
+        return None
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT u.* FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id
+           WHERE s.token = ? AND s.expira_en >= ? AND u.activo = 1""",
+        (token, _ahora_iso()),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return row
 
 def init_db():
     conn = get_db()
@@ -162,6 +293,52 @@ def init_db():
             servicios_iniciales
         )
     
+    # ------------------------------------------------------------
+    # Usuarios y sesiones (login de la aplicación web)
+    # ------------------------------------------------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            nombre TEXT NOT NULL DEFAULT '',
+            rol TEXT NOT NULL DEFAULT 'usuario',
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1,
+            creado_en TEXT NOT NULL,
+            ultimo_acceso TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sesiones (
+            token TEXT PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            creado_en TEXT NOT NULL,
+            expira_en TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones(usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sesiones_expira ON sesiones(expira_en)")
+
+    # Bootstrap del administrador: solo la primera vez (cuando aún no hay ningún usuario).
+    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    if cursor.fetchone()[0] == 0:
+        password_inicial = ADMIN_PASSWORD_INICIAL
+        generada = not password_inicial
+        if generada:
+            password_inicial = secrets.token_urlsafe(12)
+        salt, phash = _hash_password(password_inicial)
+        cursor.execute(
+            """INSERT INTO usuarios (username, nombre, rol, password_hash, password_salt, activo, creado_en)
+               VALUES (?, ?, ?, ?, ?, 1, ?)""",
+            (ADMIN_USERNAME_INICIAL, "Administradora", ROL_ADMIN, phash, salt, _ahora_iso()),
+        )
+        if generada:
+            print("[auth] ADMIN_PASSWORD no definida: se generó la clave del administrador")
+            print(f"[auth]   usuario: {ADMIN_USERNAME_INICIAL}")
+            print(f"[auth]   clave:   {password_inicial}")
+            print("[auth]   Guárdala ahora: solo se almacena su hash y no se vuelve a mostrar.")
+
     conn.commit()
     conn.close()
 
@@ -177,6 +354,218 @@ def startup():
             print('[startup] Bot de Telegram no inició (token faltante)')
     except Exception as e:
         print(f'[startup] Error arrancando bot: {e}')
+
+# ============================================================
+# ENDPOINTS: AUTENTICACIÓN
+# ============================================================
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+class UsuarioCreate(BaseModel):
+    username: str
+    nombre: str = ""
+    password: str
+    rol: str = ROL_USUARIO
+
+class UsuarioUpdate(BaseModel):
+    nombre: Optional[str] = None
+    rol: Optional[str] = None
+    activo: Optional[bool] = None
+    password: Optional[str] = None
+
+class CambioClave(BaseModel):
+    password_actual: str
+    password_nueva: str
+
+def _validar_username(username: str) -> str:
+    username = (username or "").strip()
+    if len(username) < 3 or len(username) > 32:
+        raise HTTPException(status_code=400, detail="El usuario debe tener entre 3 y 32 caracteres")
+    if not all(c.isalnum() or c in "._-" for c in username):
+        raise HTTPException(status_code=400, detail="El usuario solo admite letras, números, punto, guion y guion bajo")
+    return username
+
+def _validar_password(password: str):
+    if len(password or "") < MIN_PASSWORD:
+        raise HTTPException(status_code=400, detail=f"La contraseña debe tener al menos {MIN_PASSWORD} caracteres")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/auth/login")
+def login(data: LoginIn):
+    username = (data.username or "").strip()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE username = ?", (username,))
+    fila = cur.fetchone()
+    # Mismo mensaje para usuario inexistente y clave incorrecta (no se filtra qué falló)
+    if fila is None or not verificar_password(data.password or "", fila["password_salt"], fila["password_hash"]):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    if not fila["activo"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Este usuario está desactivado")
+    ahora = _ahora_iso()
+    cur.execute("UPDATE usuarios SET ultimo_acceso = ? WHERE id = ?", (ahora, fila["id"]))
+    conn.commit()
+    conn.close()
+    sesion = crear_sesion(fila["id"])
+    usuario = _row_usuario_publico(fila)
+    usuario["ultimo_acceso"] = ahora
+    return {"token": sesion["token"], "expira_en": sesion["expira_en"], "usuario": usuario}
+
+@app.post("/auth/logout")
+def logout(request: Request):
+    token = getattr(request.state, "token", "")
+    if token:
+        conn = get_db()
+        conn.execute("DELETE FROM sesiones WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+    return {"status": "ok"}
+
+@app.get("/auth/me")
+def me(request: Request):
+    usuario = getattr(request.state, "usuario", None)
+    if not usuario:
+        raise HTTPException(status_code=403, detail="Esta llamada requiere una sesión de usuario")
+    return {"usuario": usuario}
+
+@app.post("/auth/cambiar-clave")
+def cambiar_clave(data: CambioClave, request: Request):
+    usuario = getattr(request.state, "usuario", None)
+    if not usuario:
+        raise HTTPException(status_code=403, detail="Esta llamada requiere una sesión de usuario")
+    _validar_password(data.password_nueva)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE id = ?", (usuario["id"],))
+    fila = cur.fetchone()
+    if fila is None or not verificar_password(data.password_actual or "", fila["password_salt"], fila["password_hash"]):
+        conn.close()
+        raise HTTPException(status_code=401, detail="La contraseña actual no es correcta")
+    salt, phash = _hash_password(data.password_nueva)
+    cur.execute("UPDATE usuarios SET password_hash = ?, password_salt = ? WHERE id = ?", (phash, salt, usuario["id"]))
+    # Se cierran las demás sesiones de ese usuario (la actual sigue viva)
+    cur.execute("DELETE FROM sesiones WHERE usuario_id = ? AND token <> ?", (usuario["id"], getattr(request.state, "token", "")))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "message": "Contraseña actualizada"}
+
+# ============================================================
+# ENDPOINTS: GESTIÓN DE USUARIOS (solo administrador)
+# ============================================================
+@app.get("/usuarios")
+def listar_usuarios(_admin: dict = Depends(require_admin)):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM usuarios ORDER BY CASE rol WHEN 'admin' THEN 0 ELSE 1 END, username ASC")
+    filas = cur.fetchall()
+    conn.close()
+    return [_row_usuario_publico(f) for f in filas]
+
+@app.post("/usuarios")
+def crear_usuario(data: UsuarioCreate, _admin: dict = Depends(require_admin)):
+    username = _validar_username(data.username)
+    _validar_password(data.password)
+    if data.rol not in ROLES_VALIDOS:
+        raise HTTPException(status_code=400, detail="Rol inválido")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM usuarios WHERE username = ?", (username,))
+    if cur.fetchone():
+        conn.close()
+        raise HTTPException(status_code=409, detail="Ese nombre de usuario ya existe")
+    salt, phash = _hash_password(data.password)
+    cur.execute(
+        """INSERT INTO usuarios (username, nombre, rol, password_hash, password_salt, activo, creado_en)
+           VALUES (?, ?, ?, ?, ?, 1, ?)""",
+        (username, (data.nombre or "").strip(), data.rol, phash, salt, _ahora_iso()),
+    )
+    nuevo_id = cur.lastrowid
+    conn.commit()
+    cur.execute("SELECT * FROM usuarios WHERE id = ?", (nuevo_id,))
+    fila = cur.fetchone()
+    conn.close()
+    return _row_usuario_publico(fila)
+
+@app.patch("/usuarios/{usuario_id}")
+def actualizar_usuario(usuario_id: int, data: UsuarioUpdate, admin: dict = Depends(require_admin)):
+    if data.rol is not None and data.rol not in ROLES_VALIDOS:
+        raise HTTPException(status_code=400, detail="Rol inválido")
+    if data.password is not None:
+        _validar_password(data.password)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,))
+    fila = cur.fetchone()
+    if fila is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    pierde_admin = fila["rol"] == ROL_ADMIN and (
+        (data.rol is not None and data.rol != ROL_ADMIN) or data.activo is False
+    )
+    if pierde_admin:
+        cur.execute("SELECT COUNT(*) FROM usuarios WHERE rol = ? AND activo = 1", (ROL_ADMIN,))
+        if cur.fetchone()[0] <= 1:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Debe existir al menos un administrador activo")
+    if usuario_id == admin["id"] and data.activo is False:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No puedes desactivar tu propio usuario")
+
+    sets, params = [], []
+    if data.nombre is not None:
+        sets.append("nombre = ?")
+        params.append(data.nombre.strip())
+    if data.rol is not None:
+        sets.append("rol = ?")
+        params.append(data.rol)
+    if data.activo is not None:
+        sets.append("activo = ?")
+        params.append(1 if data.activo else 0)
+    if data.password is not None:
+        salt, phash = _hash_password(data.password)
+        sets.extend(["password_hash = ?", "password_salt = ?"])
+        params.extend([phash, salt])
+
+    if sets:
+        params.append(usuario_id)
+        cur.execute(f"UPDATE usuarios SET {', '.join(sets)} WHERE id = ?", params)
+        # Al cambiar la clave o desactivar la cuenta se invalidan sus sesiones abiertas
+        if data.password is not None or data.activo is False:
+            cur.execute("DELETE FROM sesiones WHERE usuario_id = ?", (usuario_id,))
+        conn.commit()
+    cur.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,))
+    fila = cur.fetchone()
+    conn.close()
+    return _row_usuario_publico(fila)
+
+@app.delete("/usuarios/{usuario_id}")
+def eliminar_usuario(usuario_id: int, admin: dict = Depends(require_admin)):
+    if usuario_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,))
+    fila = cur.fetchone()
+    if fila is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if fila["rol"] == ROL_ADMIN:
+        cur.execute("SELECT COUNT(*) FROM usuarios WHERE rol = ?", (ROL_ADMIN,))
+        if cur.fetchone()[0] <= 1:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Debe existir al menos un administrador")
+    cur.execute("DELETE FROM sesiones WHERE usuario_id = ?", (usuario_id,))
+    cur.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "message": "Usuario eliminado"}
 
 # Modelos Pydantic
 class ServicioCreate(BaseModel):
