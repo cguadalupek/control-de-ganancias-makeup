@@ -164,6 +164,16 @@ class ServicioCreate(BaseModel):
     porcentaje: float  # e.g. 0.30 o 0.40 o 30 o 40
     salon_id: int
 
+class ServicioLoteItem(BaseModel):
+    servicio_nombre: str
+    precio: float
+    porcentaje: float  # e.g. 0.30 o 0.40 o 30 o 40
+
+class ServicioLote(BaseModel):
+    fecha: str  # Formato YYYY-MM-DD (compartida por todo el lote)
+    salon_id: int
+    items: List[ServicioLoteItem]
+
 class MetaUpdate(BaseModel):
     anio: int
     mes: int
@@ -340,6 +350,74 @@ def registrar_servicio(data: ServicioCreate):
         "status": "ok",
         "message": "Servicio registrado correctamente",
         "entry": new_entry
+    }
+
+@app.post("/registro-lote")
+def registrar_servicios_lote(data: ServicioLote):
+    """Registra varios servicios en una sola transacción (misma fecha y salón).
+
+    Se usa cuando una misma clienta lleva más de un servicio en la misma visita:
+    todos los items se guardan juntos o ninguno (rollback si algo falla).
+    """
+    try:
+        fecha_obj = datetime.datetime.strptime(data.fecha, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Usar YYYY-MM-DD")
+
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Debes enviar al menos un servicio")
+
+    nombre_salon = salon_nombre(data.salon_id)
+    if not nombre_salon:
+        raise HTTPException(status_code=400, detail="Salón/estudio no válido")
+
+    semana = calcular_semana_mes(fecha_obj)
+    conn = get_db()
+    cursor = conn.cursor()
+    entries = []
+    try:
+        for item in data.items:
+            pct_decimal = item.porcentaje / 100.0 if item.porcentaje > 1.0 else item.porcentaje
+            pct_display = int(round(pct_decimal * 100))
+            ganancia_personal = round(item.precio * pct_decimal, 2)
+            ganancia_salon = round(item.precio - ganancia_personal, 2)
+
+            cursor.execute("""
+                INSERT INTO registro_servicios
+                (fecha, servicio_nombre, precio, porcentaje, ganancia_personal, ganancia_salon, semana, mes, anio, salon_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (data.fecha, item.servicio_nombre.strip(), item.precio, pct_decimal,
+                  ganancia_personal, ganancia_salon, semana, fecha_obj.month, fecha_obj.year, data.salon_id))
+
+            entries.append({
+                "id": cursor.lastrowid,
+                "date": data.fecha,
+                "week": f"Semana {semana}",
+                "service": item.servicio_nombre.strip(),
+                "price": item.precio,
+                "commission": pct_display,
+                "myGain": ganancia_personal,
+                "salongain": ganancia_salon,
+                "salon_id": data.salon_id,
+                "salon_name": nombre_salon,
+                "month": fecha_obj.month,
+                "year": fecha_obj.year,
+            })
+        conn.commit()
+    except Exception as exc:  # noqa: BLE001
+        conn.rollback()
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"No se pudo registrar el lote: {exc}")
+    conn.close()
+
+    return {
+        "status": "ok",
+        "message": f"{len(entries)} servicios registrados correctamente",
+        "cantidad": len(entries),
+        "total_facturado": round(sum(e["price"] for e in entries), 2),
+        "total_personal": round(sum(e["myGain"] for e in entries), 2),
+        "total_salon": round(sum(e["salongain"] for e in entries), 2),
+        "entries": entries,
     }
 
 @app.put("/registro/{id}")

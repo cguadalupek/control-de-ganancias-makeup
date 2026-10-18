@@ -47,6 +47,20 @@ const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '
 
 const DEFAULT_GOAL = 480.00;
 
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// Suma meses a una fecha YYYY-MM-DD cuidando el fin de mes (31-ene + 6m => 31-jul)
+const addMonthsYMD = (ymd, months) => {
+  const parts = String(ymd || '').split('-').map(Number);
+  const hoy = new Date();
+  const [y, m, d] = (parts.length === 3 && parts.every((n) => !isNaN(n)))
+    ? parts
+    : [hoy.getFullYear(), hoy.getMonth() + 1, hoy.getDate()];
+  const target = new Date(y, m - 1 + Number(months), 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  return `${target.getFullYear()}-${pad2(target.getMonth() + 1)}-${pad2(Math.min(d, lastDay))}`;
+};
+
 // Componente de Logo elegante GUADALUPE MAKE UP Rodriguez
 function BrandLogo({ compact = false }) {
   return (
@@ -93,8 +107,9 @@ function BrandLogo({ compact = false }) {
   );
 }
 
-// Dropdown personalizado de salón: estilo unificado del botón a la lista desplegada
-function SalonSelect({ value, onChange, salones, placeholder = 'Selecciona un salón...', allowAll = false }) {
+// Dropdown de marca reutilizable: mismo estilo del selector de Salón
+// (botón con chevron + panel animado). Se usa en Salón, Rango de fechas y Caducidad.
+function BrandSelect({ value, onChange, options = [], placeholder = 'Selecciona...', icon: Icon = Store, buttonClass = '', panelClass = '' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -106,58 +121,46 @@ function SalonSelect({ value, onChange, salones, placeholder = 'Selecciona un sa
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const options = allowAll
-    ? [{ id: 'todos', nombre: 'Todos', desc: 'Todos los salones / estudios' }, ...salones]
-    : salones;
-  const selected = options.find((o) => String(o.id) === String(value));
-
-  const descSalon = (s) => {
-    if (!s || !s.nombre) return '';
-    return /maison/i.test(s.nombre) ? 'Solo Maquillaje · 60%' : 'Maquillaje 40% · otros 30%';
-  };
+  const selected = options.find((o) => String(o.value) === String(value));
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between gap-2 p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
+        className={`w-full flex items-center justify-between gap-2 p-3 sm:p-3.5 border rounded-2xl text-sm font-semibold outline-none transition-all text-left cursor-pointer ${
           open
             ? 'border-[#ec71a8] ring-3 ring-[#ec71a8]/15 bg-white'
             : 'border-[#f9cee3] bg-[#faf5f8] hover:border-[#ec71a8]/50'
-        }`}
+        } ${buttonClass}`}
       >
-        <span className={`flex items-center gap-2 ${selected ? 'text-[#1e1e1c]' : 'text-[#8c8884]'}`}>
-          <Store className="w-4 h-4 text-[#ec71a8] shrink-0" />
-          {selected ? selected.nombre : placeholder}
+        <span className={`flex items-center gap-2 min-w-0 ${selected ? 'text-[#1e1e1c]' : 'text-[#8c8884]'}`}>
+          <Icon className="w-4 h-4 text-[#ec71a8] shrink-0" />
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
         <ChevronDown className={`w-4 h-4 text-[#ec71a8] transition-transform duration-200 shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-2 w-full rounded-2xl bg-white border border-[#f9cee3] shadow-xl shadow-[#ec71a8]/10 overflow-hidden animate-modal">
+        <div className={`absolute z-50 mt-2 w-full rounded-2xl bg-white border border-[#f9cee3] shadow-xl shadow-[#ec71a8]/10 overflow-hidden animate-modal ${panelClass}`}>
           {options.map((o) => {
-            const active = String(o.id) === String(value);
+            const active = String(o.value) === String(value);
             return (
               <button
-                key={o.id}
+                key={o.value}
                 type="button"
-                onClick={() => { onChange(String(o.id)); setOpen(false); }}
+                onClick={() => { onChange(String(o.value)); setOpen(false); }}
                 className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors cursor-pointer border-b border-[#fce3ed] last:border-b-0 ${
                   active ? 'bg-[#fce3ed]' : 'bg-white hover:bg-[#fff5f8]'
                 }`}
               >
                 <span className="flex items-center gap-2.5 min-w-0">
                   <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-[#ec71a8] text-white' : 'bg-[#fce3ed] text-[#ec71a8]'}`}>
-                    <Store className="w-4 h-4" />
+                    <Icon className="w-4 h-4" />
                   </span>
                   <span className="flex flex-col min-w-0">
-                    <span className={`text-sm font-bold ${active ? 'text-[#ec71a8]' : 'text-[#1e1e1c]'}`}>{o.nombre}</span>
-                    {o.desc ? (
-                      <span className="text-[10px] font-semibold text-[#8c8884]">{o.desc}</span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-[#8c8884]">{descSalon(o)}</span>
-                    )}
+                    <span className={`text-sm font-bold ${active ? 'text-[#ec71a8]' : 'text-[#1e1e1c]'}`}>{o.label}</span>
+                    {o.desc && <span className="text-[10px] font-semibold text-[#8c8884]">{o.desc}</span>}
                   </span>
                 </span>
                 {active && <Check className="w-4 h-4 text-[#ec71a8] shrink-0" />}
@@ -168,6 +171,25 @@ function SalonSelect({ value, onChange, salones, placeholder = 'Selecciona un sa
       )}
     </div>
   );
+}
+
+// Selector de salón / estudio (envoltura de BrandSelect para mantener la API previa)
+function SalonSelect({ value, onChange, salones, placeholder = 'Salón', allowAll = false }) {
+  const descSalon = (s) => {
+    if (!s || !s.nombre) return '';
+    return /maison/i.test(s.nombre) ? 'Solo Maquillaje · 60%' : 'Maquillaje 40% · otros 30%';
+  };
+
+  const base = allowAll ? [{ value: 'todos', label: 'Todos', desc: 'Todos los salones / estudios' }] : [];
+  const options = base.concat(
+    (salones || []).map((s) => ({
+      value: String(s.id),
+      label: s.nombre,
+      desc: s.desc || descSalon(s),
+    }))
+  );
+
+  return <BrandSelect value={value} onChange={onChange} options={options} placeholder={placeholder} icon={Store} />;
 }
 
 export default function App() {
@@ -222,6 +244,7 @@ export default function App() {
   const [regService, setRegService] = useState('');
   const [regPrice, setRegPrice] = useState('');
   const [regCommission, setRegCommission] = useState(40); // % autocompletado (ajustable)
+  const [extraItems, setExtraItems] = useState([]); // servicios extra de la misma clienta (misma visita)
 
   // Salones / estudios disponibles
   const [salones, setSalones] = useState([]);
@@ -243,19 +266,17 @@ export default function App() {
   const [productStatusFilter, setProductStatusFilter] = useState('activo'); // 'activo' | 'terminado' | 'todos'
   const [productLoading, setProductLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [showProductForm, setShowProductForm] = useState(false); // en móvil el formulario se abre con el FAB
+  const productFormRef = useRef(null);
 
   // Formulario de nuevo producto
   const todayYMDProduct = todayYMD; // reutilizamos el todayYMD ya definido arriba
   const [prodName, setProdName] = useState('');
-  const [prodQuantity, setProdQuantity] = useState(1);
   const [prodPrice, setProdPrice] = useState('');
   const [prodPurchaseDate, setProdPurchaseDate] = useState(todayYMDProduct);
   const [prodStartDate, setProdStartDate] = useState('');
-  const [prodExpirationDate, setProdExpirationDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 6);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  });
+  const [prodExpirationDate, setProdExpirationDate] = useState(() => addMonthsYMD(todayYMDProduct, 6));
+  const [prodExpiryPreset, setProdExpiryPreset] = useState('6'); // '6' | '12' | '' (personalizada)
 
   // Modal de edición de producto
   const [editProdName, setEditProdName] = useState('');
@@ -279,8 +300,6 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSalon, setFilterSalon] = useState('todos'); // 'todos' | id del salón
   const [quickRange, setQuickRange] = useState('all'); // preselección del dropdown de rango
-  const [showCalendarWidget, setShowCalendarWidget] = useState(false);
-  const [calViewDate, setCalViewDate] = useState(() => new Date());
 
   // Cargar servicios desde backend
   useEffect(() => {
@@ -348,12 +367,47 @@ export default function App() {
   // Cálculos en vivo (Nuevo Registro)
   const livePrice = parseFloat(regPrice) || 0;
   const liveMyGain = livePrice * (regCommission / 100);
-  const liveSalonGain = livePrice - liveMyGain;
 
   // Cálculos en vivo (Modal de Edición)
   const editLivePrice = parseFloat(editPrice) || 0;
   const editLiveMyGain = editLivePrice * (editCommission / 100);
   const editLiveSalonGain = editLivePrice - editLiveMyGain;
+
+  // ---- Servicios extra: mismos fecha + salón, una sola transacción ----
+  const itemsCount = 1 + extraItems.length;
+  const extraTotal = extraItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
+  const extraMyGain = extraItems.reduce(
+    (acc, it) => acc + (parseFloat(it.price) || 0) * ((Number(it.commission) || 0) / 100), 0
+  );
+  const batchLivePrice = livePrice + extraTotal;
+  const batchLiveMyGain = liveMyGain + extraMyGain;
+  const batchLiveSalonGain = batchLivePrice - batchLiveMyGain;
+
+  const comisionExtra = (salonId, servicio) => (esMaison(salonId) ? 60 : comisionSugerida(salonId, servicio));
+
+  const addExtraItem = () => {
+    setExtraItems((prev) => [
+      ...prev,
+      {
+        key: `extra-${Date.now()}-${prev.length}`,
+        service: esMaison(regSalonId) ? 'Maquillaje' : '',
+        price: '',
+        commission: comisionExtra(regSalonId, ''),
+      },
+    ]);
+  };
+
+  const updateExtraItem = (key, patch) => {
+    setExtraItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  };
+
+  const handleExtraServiceChange = (key, val) => {
+    setExtraItems((prev) => prev.map((it) => (
+      it.key === key ? { ...it, service: val, commission: comisionExtra(regSalonId, val) } : it
+    )));
+  };
+
+  const removeExtraItem = (key) => setExtraItems((prev) => prev.filter((it) => it.key !== key));
 
   // Cambio de salón en el formulario: recalcula comisión y, en Maison, fuerza Maquillaje
   const handleRegSalonChange = (val) => {
@@ -361,8 +415,10 @@ export default function App() {
     if (esMaison(val)) {
       setRegService('Maquillaje');
       setRegCommission(60);
+      setExtraItems((prev) => prev.map((it) => ({ ...it, service: 'Maquillaje', commission: 60 })));
     } else {
       setRegCommission(comisionSugerida(val, regService));
+      setExtraItems((prev) => prev.map((it) => ({ ...it, commission: comisionSugerida(val, it.service) })));
     }
   };
   const handleRegServiceChange = (val) => {
@@ -389,63 +445,105 @@ export default function App() {
     }
   };
 
-  // Envío nuevo servicio
+  // Envío nuevo servicio (principal + servicios extra en una sola transacción)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!regSalonId) { showToast('Selecciona el salón/estudio', 'error'); return; }
-    if (!regService.trim()) return;
+    if (!regService.trim()) { showToast('Indica el servicio realizado', 'error'); return; }
     const priceNum = parseFloat(regPrice);
-    if (isNaN(priceNum) || priceNum <= 0) return;
+    if (isNaN(priceNum) || priceNum <= 0) { showToast('Ingresa un precio válido', 'error'); return; }
 
-    const commNum = Number(regCommission);
-    const myGain = Math.round(priceNum * (commNum / 100) * 100) / 100;
-    const salongain = Math.round((priceNum - myGain) * 100) / 100;
+    // Validación de los servicios extra
+    const extras = [];
+    for (const it of extraItems) {
+      const p = parseFloat(it.price);
+      if (!it.service.trim()) { showToast('Completa el nombre del servicio extra', 'error'); return; }
+      if (isNaN(p) || p <= 0) { showToast('Ingresa un precio válido en el servicio extra', 'error'); return; }
+      extras.push({ service: it.service.trim(), price: p, commission: Number(it.commission) || comisionExtra(regSalonId, it.service) });
+    }
+
+    const items = [
+      { service: regService.trim(), price: priceNum, commission: Number(regCommission) },
+      ...extras,
+    ];
 
     const dateObj = new Date(regDate + 'T00:00:00');
     const sMonth = dateObj.getMonth() + 1;
     const sYear = dateObj.getFullYear();
 
-    const newEntry = {
-      id: Date.now(),
-      date: regDate,
-      week: getWeekOfMonth(regDate),
-      service: regService.trim(),
-      price: priceNum,
-      commission: commNum,
-      myGain: myGain,
-      salongain: salongain,
-      salon_id: Number(regSalonId),
-      salon_name: salonNombre(regSalonId),
-      month: sMonth,
-      year: sYear
+    const buildLocal = (item, id) => {
+      const myGain = Math.round(item.price * (item.commission / 100) * 100) / 100;
+      return {
+        id: id ?? `local-${Date.now()}-${Math.random()}`,
+        date: regDate,
+        week: getWeekOfMonth(regDate),
+        service: item.service,
+        price: item.price,
+        commission: item.commission,
+        myGain: myGain,
+        salongain: Math.round((item.price - myGain) * 100) / 100,
+        salon_id: Number(regSalonId),
+        salon_name: salonNombre(regSalonId),
+        month: sMonth,
+        year: sYear,
+      };
     };
 
+    let creados = items.map((it) => buildLocal(it));
+
     try {
-      const res = await fetch(`${API_BASE_URL}/registro`, {
+      const res = await fetch(`${API_BASE_URL}/registro-lote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fecha: regDate,
-          servicio_nombre: regService.trim(),
-          precio: priceNum,
-          porcentaje: commNum,
-          salon_id: Number(regSalonId)
-        })
+          salon_id: Number(regSalonId),
+          items: items.map((it) => ({
+            servicio_nombre: it.service,
+            precio: it.price,
+            porcentaje: it.commission,
+          })),
+        }),
       });
+
       if (res.ok) {
         const data = await res.json();
-        if (data.entry) {
-          newEntry.id = data.entry.id;
+        if (Array.isArray(data.entries) && data.entries.length === items.length) {
+          creados = data.entries;
+        }
+      } else {
+        // Respaldo: si el endpoint en lote no está disponible, se registra uno por uno
+        for (let i = 0; i < items.length; i += 1) {
+          const it = items[i];
+          const r2 = await fetch(`${API_BASE_URL}/registro`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fecha: regDate,
+              servicio_nombre: it.service,
+              precio: it.price,
+              porcentaje: it.commission,
+              salon_id: Number(regSalonId),
+            }),
+          });
+          if (r2.ok) {
+            const d2 = await r2.json();
+            if (d2.entry) creados[i] = d2.entry;
+          }
         }
       }
     } catch (err) {
       console.log('Guardado local activado');
     }
 
-    setServices((prev) => [newEntry, ...prev]);
+    setServices((prev) => [...creados, ...prev]);
     setRegService('');
     setRegPrice('');
-    showToast('¡Servicio registrado con éxito!', 'success');
+    setExtraItems([]);
+    showToast(
+      items.length > 1 ? `¡${items.length} servicios registrados juntos!` : '¡Servicio registrado con éxito!',
+      'success'
+    );
   };
 
   // Abrir modal de edición
@@ -556,7 +654,7 @@ export default function App() {
     }
     const payload = {
       name: prodName.trim(),
-      quantity: Number(prodQuantity) || 1,
+      quantity: 1, // stock unitario: cada producto es 1 unidad (campo bloqueado en el formulario)
       price: Number(prodPrice) || 0,
       purchase_date: prodPurchaseDate,
       start_date: prodStartDate || null,
@@ -574,16 +672,29 @@ export default function App() {
       }
       showToast('¡Producto registrado!', 'success');
       setProdName('');
-      setProdQuantity(1);
       setProdPrice('');
       setProdStartDate('');
-      const d = new Date();
-      d.setMonth(d.getMonth() + 6);
-      setProdExpirationDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
       setProdPurchaseDate(todayYMD);
+      setProdExpiryPreset('6');
+      setProdExpirationDate(addMonthsYMD(todayYMD, 6));
       await fetchProducts(productSearch, productStatusFilter);
     } catch (err) {
       showToast(err.message || 'Error al registrar', 'error');
+    }
+  };
+
+  // Caducidad automática: 6 o 12 meses desde la fecha de compra
+  const handlePurchaseDateChange = (val) => {
+    setProdPurchaseDate(val);
+    if (prodExpiryPreset === '6' || prodExpiryPreset === '12') {
+      setProdExpirationDate(addMonthsYMD(val, Number(prodExpiryPreset)));
+    }
+  };
+
+  const handleExpiryPresetChange = (val) => {
+    setProdExpiryPreset(val);
+    if (val === '6' || val === '12') {
+      setProdExpirationDate(addMonthsYMD(prodPurchaseDate || todayYMD, Number(val)));
     }
   };
 
@@ -806,16 +917,25 @@ export default function App() {
     return filteredServices.slice(start, start + itemsPerPage);
   }, [filteredServices, reportPage, itemsPerPage]);
 
+  // Las métricas filtradas solo se muestran cuando el usuario aplica un filtro explícito
+  const hasActiveFilters = Boolean(
+    filterFrom || filterTo || searchTerm.trim() || filterSalon !== 'todos' || quickRange !== 'all'
+  );
+
   const reportTotalMyGain = filteredServices.reduce((acc, curr) => acc + curr.myGain, 0);
   const reportTotalSalonGain = filteredServices.reduce((acc, curr) => acc + curr.salongain, 0);
   const reportTotalFacturado = filteredServices.reduce((acc, curr) => acc + curr.price, 0);
 
-  // Fechas con servicios
-  const datesWithServices = useMemo(() => {
-    const set = new Set();
-    services.forEach((s) => set.add(s.date));
-    return set;
-  }, [services]);
+  // Opciones del dropdown "Rango de fechas" (mismo estilo del selector de Salón)
+  const rangeOptions = [
+    { value: 'all', label: 'Todo el histórico', desc: 'Sin filtro de fechas' },
+    { value: 'today', label: 'Hoy', desc: 'Solo los servicios de hoy' },
+    { value: 'week', label: 'Esta semana', desc: 'Semana actual (lunes a domingo)' },
+    { value: 'month', label: 'Este mes', desc: 'Mes calendario en curso' },
+    { value: 'last_month', label: 'Mes anterior', desc: 'Mes calendario anterior' },
+    { value: 'year', label: 'Este año', desc: 'Año en curso' },
+    { value: 'custom', label: 'Rango personalizado', desc: 'Elige las fechas abajo' },
+  ];
 
   // Atajos rápidos de filtro
   const handleQuickFilter = (type) => {
@@ -950,48 +1070,6 @@ export default function App() {
   };
 
   // Mini Calendario
-  const currentMonthYearStr = calViewDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
-  const calendarDays = useMemo(() => {
-    const year = calViewDate.getFullYear();
-    const month = calViewDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    let startDayOfWeek = firstDay.getDay() - 1;
-    if (startDayOfWeek === -1) startDayOfWeek = 6;
-
-    const days = [];
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(null);
-    }
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
-      days.push({
-        dayNumber: d,
-        dateStr: dateStr,
-        hasServices: datesWithServices.has(dateStr),
-        isSelectedStart: filterFrom === dateStr,
-        isSelectedEnd: filterTo === dateStr,
-        isInRange: filterFrom && filterTo && dateStr >= filterFrom && dateStr <= filterTo
-      });
-    }
-    return days;
-  }, [calViewDate, filterFrom, filterTo, datesWithServices]);
-
-  const handleCalendarDayClick = (dateStr) => {
-    if (!filterFrom || (filterFrom && filterTo)) {
-      setFilterFrom(dateStr);
-      setFilterTo('');
-    } else if (filterFrom && !filterTo) {
-      if (dateStr < filterFrom) {
-        setFilterTo(filterFrom);
-        setFilterFrom(dateStr);
-      } else {
-        setFilterTo(dateStr);
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#faf5f8] text-[#1e1e1c] flex flex-col md:flex-row antialiased">
@@ -1184,74 +1262,66 @@ export default function App() {
       </div>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 px-3 py-4 sm:p-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-4 sm:gap-8 overflow-y-auto">
+      <main className="flex-1 px-3 py-4 sm:p-8 pb-36 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-4 sm:gap-8 overflow-y-auto">
 
-        {/* HEADER DE BIENVENIDA Y CONTROL DE MES */}
-        <header className="hidden md:flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-3xl p-6 sm:p-7 shadow-sm">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#ec71a8] mb-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              Sistema de Gestión
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1e1e1c] tracking-tight">
-              {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
-              {activeTab === 'nuevo_servicio' && 'Nuevo Registro de Servicio'}
-              {activeTab === 'productos' && 'Registro y Control de Productos'}
-              {activeTab === 'informes' && 'Historial, Edición e Informes'}
-            </h2>
-            <p className="text-sm text-[#6b6764] font-medium mt-1">
-              {activeTab === 'resumen' && 'El panel se actualiza automáticamente al inicio de cada mes.'}
-              {activeTab === 'nuevo_servicio' && 'Calcula comisiones y distribuye la ganancia al instante.'}
-              {activeTab === 'productos' && 'Lleva el inventario de tu maquillaje y controla vencimientos con semáforo 🟢🟡🔴.'}
-              {activeTab === 'informes' && 'Consulta cualquier rango de fechas, edita o elimina servicios registrados.'}
-            </p>
-          </div>
+        {/* BARRA DE TÍTULO + CONTROL DE MES (compacta, solo desktop) */}
+        <header className="hidden md:flex items-center justify-between gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-2xl px-5 py-3.5 shadow-sm">
+          <h2 className="text-base lg:text-lg font-extrabold text-[#1e1e1c] tracking-tight">
+            {activeTab === 'resumen' && 'Panel de Rendimiento Mensual'}
+            {activeTab === 'nuevo_servicio' && 'Nuevo Registro de Servicio'}
+            {activeTab === 'productos' && 'Registro y Control de Productos'}
+            {activeTab === 'informes' && 'Historial, Edición e Informes'}
+          </h2>
 
-          {/* SELECTOR DE MES DINÁMICO (Para Resumen General) */}
-          {activeTab === 'resumen' && (
-            <div className="w-full sm:w-auto flex items-center justify-between gap-1.5 sm:gap-2 bg-[#fdf2f7] p-1.5 sm:p-2 rounded-2xl border border-[#f9cee3] flex-nowrap shrink-0 shadow-xs">
+          {activeTab === 'resumen' ? (
+            <div className="flex items-center gap-2 bg-[#fdf2f7] p-1.5 rounded-2xl border border-[#f9cee3] shrink-0 shadow-xs">
               <button
                 onClick={handlePrevDashboardMonth}
-                className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
+                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
                 title="Mes anterior"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
-              <div className="px-2 sm:px-3 py-1 flex items-center justify-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial text-center min-w-0">
+              <div className="px-2 py-0.5 flex items-center gap-2 text-center min-w-0">
                 <CalendarIcon className="w-4 h-4 text-[#ec71a8] shrink-0" />
-                <span className="font-extrabold text-xs sm:text-base text-[#1e1e1c] capitalize whitespace-nowrap truncate">
+                <span className="font-extrabold text-sm text-[#1e1e1c] capitalize whitespace-nowrap">
                   {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
                 </span>
                 {isViewingCurrentMonth ? (
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase bg-[#ec71a8] text-white px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                  <span className="text-[10px] font-black uppercase bg-[#ec71a8] text-white px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                     Mes en curso
                   </span>
                 ) : (
                   <button
                     onClick={handleCurrentDashboardMonth}
-                    className="text-[10px] sm:text-[11px] font-bold text-[#ec71a8] hover:underline cursor-pointer whitespace-nowrap shrink-0"
+                    className="text-[11px] font-bold text-[#ec71a8] hover:underline cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    (Volver a Hoy)
+                    Volver a hoy
                   </button>
                 )}
               </div>
 
               <button
                 onClick={handleNextDashboardMonth}
-                className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
+                className="p-2 rounded-xl bg-white hover:bg-[#fce3ed] text-[#1e1e1c] transition-colors border border-[#f9cee3]/60 shadow-xs cursor-pointer shrink-0"
                 title="Mes siguiente"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-          )}
-
-          {activeTab !== 'resumen' && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
-                {services.length} {services.length === 1 ? 'servicio registrado' : 'servicios registrados'}
-              </span>
+          ) : (
+            <div className="flex items-center gap-3 shrink-0">
+              {activeTab === 'productos' && (
+                <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
+                  {products.length} {products.length === 1 ? 'producto' : 'productos'}
+                </span>
+              )}
+              {activeTab === 'nuevo_servicio' && (
+                <span className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3.5 py-1.5 rounded-xl border border-[#f9cee3]">
+                  {services.length} {services.length === 1 ? 'servicio registrado' : 'servicios registrados'}
+                </span>
+              )}
             </div>
           )}
         </header>
@@ -1347,8 +1417,8 @@ export default function App() {
             {/* SECCIÓN DINÁMICA: EVOLUCIÓN SEMANAL & DESGLOSE POR COMISIÓN */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               
-              {/* RENDIMIENTO SEMANAL (SEMANAS 1 A 5) */}
-              <div className="card-luxury rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
+              {/* RENDIMIENTO SEMANAL (SEMANAS 1 A 5) — solo desktop, en móvil se oculta para no alargar el scroll */}
+              <div className="hidden lg:flex card-luxury rounded-3xl p-6 lg:col-span-2 flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-5">
                     <div className="flex items-center gap-2.5">
@@ -1664,17 +1734,17 @@ export default function App() {
         {/* ================= VISTA 2: NUEVO REGISTRO ================= */}
         {activeTab === 'nuevo_servicio' && (
           <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-            <section className="card-luxury rounded-3xl p-6 sm:p-9">
-              <div className="flex items-center justify-between border-b border-[#fce3ed] pb-5 mb-7">
+            <section className="card-luxury rounded-3xl p-4 sm:p-8">
+              <div className="flex items-center justify-between border-b border-[#fce3ed] pb-4 mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/20">
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl sm:text-2xl font-extrabold text-[#1e1e1c]">
+                    <h3 className="text-lg sm:text-2xl font-extrabold text-[#1e1e1c]">
                       Registrar Nuevo Servicio
                     </h3>
-                    <p className="text-xs text-[#8c8884]">
+                    <p className="text-[11px] sm:text-xs text-[#8c8884]">
                       Ingresa los datos para calcular la comisión automáticamente
                     </p>
                   </div>
@@ -1685,11 +1755,11 @@ export default function App() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
 
                   {/* 0. SALÓN / ESTUDIO (obligatorio) */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <Store className="w-4 h-4 text-[#ec71a8]" />
                       Salón / Estudio
                     </label>
@@ -1702,7 +1772,7 @@ export default function App() {
 
                   {/* 1. FECHA */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
                       Fecha del Servicio
                     </label>
@@ -1710,24 +1780,24 @@ export default function App() {
                       type="date"
                       value={regDate}
                       onChange={(e) => setRegDate(e.target.value)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     />
                   </div>
 
                   {/* 2. SERVICIO REALIZADO */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-[#ec71a8]" />
                       Servicio Realizado
                     </label>
                     <input
                       type="text"
-                      placeholder="Ej. Maquillaje Social, Novia, Pestañas..."
+                      placeholder="Ej. Maquillaje Social"
                       value={regService}
                       onChange={(e) => handleRegServiceChange(e.target.value)}
                       disabled={esMaison(regSalonId)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
+                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-semibold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884] disabled:cursor-not-allowed"
                       required
                     />
                     {esMaison(regSalonId) && (
@@ -1739,7 +1809,7 @@ export default function App() {
 
                   {/* 3. PRECIO COBRADO */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <DollarSign className="w-4 h-4 text-[#ec71a8]" />
                       Precio Cobrado (S/)
                     </label>
@@ -1750,14 +1820,14 @@ export default function App() {
                       placeholder="0.00"
                       value={regPrice}
                       onChange={(e) => setRegPrice(e.target.value)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     />
                   </div>
 
                   {/* 4. COMISIÓN (autocompletada, ajustable) */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                       <Percent className="w-4 h-4 text-[#ec71a8]" />
                       Comisión (% Mi Ganancia)
                     </label>
@@ -1768,7 +1838,7 @@ export default function App() {
                       step="1"
                       value={regCommission}
                       onChange={(e) => setRegCommission(Number(e.target.value) || 0)}
-                      className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
+                      className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-3 focus:ring-[#ec71a8]/15 bg-[#faf5f8] focus:bg-white transition-all"
                       required
                     />
                     <span className="text-[10px] font-semibold text-[#8c8884]">
@@ -1780,23 +1850,111 @@ export default function App() {
 
                 </div>
 
-                {/* VISTA PREVIA DEL CÁLCULO EN VIVO */}
-                {livePrice > 0 && (
-                  <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+                {/* SERVICIOS EXTRA: misma clienta, misma transacción */}
+                <div className="rounded-2xl border border-dashed border-[#f9cee3] bg-[#fff9fb] p-3 sm:p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-[#ec71a8]" />
-                      <span className="font-extrabold text-sm text-[#1e1e1c]">Cálculo en Tiempo Real:</span>
+                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                      <span className="text-xs sm:text-sm font-extrabold text-[#1e1e1c]">Servicios extra (misma clienta)</span>
+                      {extraItems.length > 0 && (
+                        <span className="text-[10px] font-black bg-[#fce3ed] text-[#ec71a8] border border-[#f9cee3] px-2 py-0.5 rounded-full">
+                          {extraItems.length}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-6 text-sm">
+                    <button
+                      type="button"
+                      onClick={addExtraItem}
+                      className="px-3 py-2 rounded-xl bg-white border border-[#f9cee3] text-[#ec71a8] hover:bg-[#fce3ed] font-extrabold text-[11px] sm:text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Añadir servicio
+                    </button>
+                  </div>
+
+                  {extraItems.length === 0 ? (
+                    <p className="text-[11px] text-[#8c8884] font-medium">
+                      Si la clienta lleva más de un servicio, añádelos aquí: se guardan juntos con la misma fecha y salón.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      {extraItems.map((it, idx) => (
+                        <div key={it.key} className="relative grid grid-cols-2 sm:grid-cols-[1fr_7rem_6rem] gap-2 items-end bg-white border border-[#f9cee3] rounded-2xl p-2.5 pr-12">
+                          <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">
+                              Servicio {idx + 2}
+                            </label>
+                            <input
+                              type="text"
+                              value={it.service}
+                              onChange={(e) => handleExtraServiceChange(it.key, e.target.value)}
+                              disabled={esMaison(regSalonId)}
+                              placeholder="Ej. Pestañas"
+                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-semibold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all disabled:bg-[#fce3ed]/60 disabled:text-[#8c8884]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Precio S/</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={it.price}
+                              onChange={(e) => updateExtraItem(it.key, { price: e.target.value })}
+                              placeholder="0.00"
+                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a4744]">Comisión %</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={it.commission}
+                              onChange={(e) => updateExtraItem(it.key, { commission: Number(e.target.value) || 0 })}
+                              className="p-2.5 border border-[#f9cee3] rounded-xl text-sm font-bold outline-none focus:border-[#ec71a8] bg-[#faf5f8] focus:bg-white transition-all"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeExtraItem(it.key)}
+                            title="Quitar servicio extra"
+                            aria-label="Quitar servicio extra"
+                            className="absolute right-2 bottom-2 p-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-[#6b6764] px-1">
+                        <span>{extraItems.length} extra{extraItems.length === 1 ? '' : 's'} · Total S/ {extraTotal.toFixed(2)}</span>
+                        <span className="text-[#ec71a8]">Mi ganancia extra: S/ {extraMyGain.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* VISTA PREVIA DEL CÁLCULO EN VIVO (suma del servicio principal + extras) */}
+                {batchLivePrice > 0 && (
+                  <div className="bg-gradient-to-r from-[#fff5f8] via-[#fdf2f7] to-[#fdebdd]/40 border border-[#f9cee3] rounded-2xl p-3.5 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#ec71a8]" />
+                      <span className="font-extrabold text-xs sm:text-sm text-[#1e1e1c]">
+                        Cálculo en Tiempo Real{itemsCount > 1 ? ` (${itemsCount} servicios)` : ''}:
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
                       <div>
                         <span className="text-[#8c8884] font-medium">Total: </span>
-                        <span className="font-extrabold text-[#1e1e1c]">S/ {livePrice.toFixed(2)}</span>
+                        <span className="font-extrabold text-[#1e1e1c]">S/ {batchLivePrice.toFixed(2)}</span>
                       </div>
-                      <div className="bg-[#ec71a8] text-white px-4 py-1.5 rounded-xl font-extrabold shadow-sm">
-                        Mi Ganancia ({regCommission}%): S/ {liveMyGain.toFixed(2)}
+                      <div className="bg-[#ec71a8] text-white px-3 py-1.5 rounded-xl font-extrabold shadow-sm">
+                        Mi Ganancia: S/ {batchLiveMyGain.toFixed(2)}
                       </div>
-                      <div className="bg-[#1e1e1c] text-[#ecc880] px-4 py-1.5 rounded-xl font-bold">
-                        Salón ({100 - regCommission}%): S/ {liveSalonGain.toFixed(2)}
+                      <div className="bg-[#1e1e1c] text-[#ecc880] px-3 py-1.5 rounded-xl font-bold">
+                        Salón: S/ {batchLiveSalonGain.toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -1815,7 +1973,7 @@ export default function App() {
                     className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-[#ec71a8]/25 cursor-pointer flex items-center gap-2 transition-transform active:scale-98"
                   >
                     <CheckCircle2 className="w-5 h-5" />
-                    Guardar Registro de Servicio
+                    {itemsCount > 1 ? `Guardar ${itemsCount} servicios` : 'Guardar Registro de Servicio'}
                   </button>
                 </div>
               </form>
@@ -1827,241 +1985,153 @@ export default function App() {
         {activeTab === 'informes' && (
           <div className="flex flex-col gap-8 animate-in fade-in duration-300">
 
-            {/* SECCIÓN DE FILTRO CON CALENDARIO */}
-            <section className="card-luxury rounded-3xl p-6 sm:p-7 flex flex-col gap-6">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#fce3ed] pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center">
-                    <CalendarRange className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
-                      Filtro de Rango y Búsqueda
-                    </h3>
-                    <p className="text-xs text-[#8c8884]">
-                      Selecciona un rango de fechas o busca por nombre de servicio
-                    </p>
-                  </div>
+            {/* SECCIÓN DE FILTROS */}
+            <section className="card-luxury rounded-3xl p-4 sm:p-7 flex flex-col gap-4 sm:gap-5">
+              <div className="flex items-center gap-3 border-b border-[#fce3ed] pb-3.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#fce3ed] text-[#ec71a8] flex items-center justify-center shrink-0">
+                  <CalendarRange className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
+                <div className="min-w-0">
+                  <h3 className="text-base sm:text-xl font-extrabold text-[#1e1e1c]">
+                    Filtros e Historial
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-[#8c8884]">
+                    Rango de fechas, salón o nombre del servicio
+                  </p>
+                </div>
+              </div>
 
-                {/* FILTRO DE RANGO (dropdown) + contador de servicios */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
+                {/* DROPDOWNS + CONTADOR DE SERVICIOS EN LA MISMA FILA */}
+                <div className="grid grid-cols-[1fr_auto] sm:flex sm:flex-wrap sm:items-center gap-2.5">
+                  <div className="min-w-0 sm:w-56">
+                    <BrandSelect
                       value={quickRange}
-                      onChange={(e) => handleQuickFilter(e.target.value)}
-                      className="select-brand px-4 py-2.5 rounded-2xl border border-[#f9cee3] bg-white text-sm font-bold text-[#1e1e1c] outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 cursor-pointer"
-                    >
-                      <option value="all">Todo el Histórico</option>
-                      <option value="today">Hoy</option>
-                      <option value="week">Esta Semana</option>
-                      <option value="month">Este Mes</option>
-                      <option value="last_month">Mes Anterior</option>
-                      <option value="year">Este Año</option>
-                      {quickRange === 'custom' && <option value="custom">Rango personalizado</option>}
-                    </select>
-                    <button
-                      onClick={() => setShowCalendarWidget(!showCalendarWidget)}
-                      className={`px-3.5 py-2 border rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        showCalendarWidget ? 'bg-[#ec71a8] text-white border-[#ec71a8] shadow-sm' : 'bg-[#fdebdd] text-[#b8860b] border-[#edd5b6]'
-                      }`}
-                    >
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      {showCalendarWidget ? 'Ocultar Calendario' : 'Calendario Visual'}
-                    </button>
-                  </div>
-                  <span className="text-xs font-black bg-[#fce3ed] text-[#ec71a8] px-3.5 py-2 rounded-xl border border-[#f9cee3] whitespace-nowrap">
-                    {filteredServices.length} {filteredServices.length === 1 ? 'servicio' : 'servicios'}
-                  </span>
-                </div>
-              </div>
-
-              {/* FILTRO POR SALÓN / ESTUDIO (dropdown) */}
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xs font-bold text-[#6b6764] flex items-center gap-1.5">
-                  <Store className="w-3.5 h-3.5 text-[#ec71a8]" />
-                  Salón:
-                </span>
-                <div className="w-60">
-                  <SalonSelect
-                    value={filterSalon}
-                    onChange={(v) => setFilterSalon(v)}
-                    salones={salones}
-                    allowAll
-                    placeholder="Todos"
-                  />
-                </div>
-              </div>
-
-              {/* INPUTS DE FILTRO */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Fecha Desde:
-                  </label>
-                  <input
-                    type="date"
-                    value={filterFrom}
-                    onChange={(e) => { setFilterFrom(e.target.value); setQuickRange('custom'); }}
-                    className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
-                    Fecha Hasta:
-                  </label>
-                  <input
-                    type="date"
-                    value={filterTo}
-                    onChange={(e) => { setFilterTo(e.target.value); setQuickRange('custom'); }}
-                    className="p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#6b6764] flex items-center gap-1">
-                    <Search className="w-3.5 h-3.5 text-[#8c8884]" />
-                    Buscar Servicio:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Ej. Maquillaje, Alisado..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full p-3 border border-[#f9cee3] rounded-2xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                      onChange={handleQuickFilter}
+                      options={rangeOptions}
+                      placeholder="Rango de fechas"
+                      icon={CalendarRange}
                     />
-                    {searchTerm && (
-                      <button 
-                        onClick={() => setSearchTerm('')}
-                        className="absolute right-3 top-3 text-[#8c8884] hover:text-[#1e1e1c] text-xs font-bold cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    )}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {(filterFrom || filterTo || searchTerm || filterSalon !== 'todos') && (
+                  <span className="self-center text-[11px] sm:text-xs font-black bg-[#fce3ed] text-[#ec71a8] px-2.5 sm:px-3 py-2 rounded-xl border border-[#f9cee3] whitespace-nowrap">
+                    {filteredServices.length} <span className="hidden sm:inline">{filteredServices.length === 1 ? 'servicio' : 'servicios'}</span><span className="sm:hidden">serv.</span>
+                  </span>
+                  <div className="min-w-0 sm:w-52">
+                    <SalonSelect
+                      value={filterSalon}
+                      onChange={(v) => setFilterSalon(v)}
+                      salones={salones}
+                      allowAll
+                      placeholder="Salón"
+                    />
+                  </div>
+                  {hasActiveFilters && (
                     <button
                       onClick={() => { setFilterFrom(''); setFilterTo(''); setSearchTerm(''); setFilterSalon('todos'); setQuickRange('all'); }}
-                      className="w-full p-3 bg-[#fce3ed] hover:bg-[#f9cee3] text-[#ec71a8] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      className="px-3 py-2 bg-white hover:bg-[#fce3ed] text-[#ec71a8] rounded-xl text-[11px] sm:text-xs font-extrabold flex items-center gap-1.5 cursor-pointer border border-[#f9cee3] transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      Limpiar Filtros
+                      Limpiar
                     </button>
                   )}
                 </div>
-              </div>
 
-              {/* CALENDARIO VISUAL INTERACTIVO */}
-              {showCalendarWidget && (
-                <div className="bg-[#fff9fb] border border-[#f9cee3] rounded-3xl p-5 shadow-inner animate-modal">
-                  <div className="flex items-center justify-between mb-4">
-                    <button
-                      onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1))}
-                      className="p-2 bg-white border border-[#f9cee3] rounded-xl hover:bg-[#fce3ed] cursor-pointer"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <div className="text-base font-extrabold capitalize text-[#1e1e1c] flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4 text-[#ec71a8]" />
-                      {currentMonthYearStr}
-                    </div>
-                    <button
-                      onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1))}
-                      className="p-2 bg-white border border-[#f9cee3] rounded-xl hover:bg-[#fce3ed] cursor-pointer"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                {/* INPUTS COMPACTOS: DESDE / HASTA / SERVICIO */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-[#6b6764]">Desde</label>
+                    <input
+                      type="date"
+                      value={filterFrom}
+                      onChange={(e) => { setFilterFrom(e.target.value); setQuickRange('custom'); }}
+                      className="p-2.5 sm:p-3 border border-[#f9cee3] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[11px] font-black text-[#8c8884] mb-2 uppercase">
-                    <span>Lun</span>
-                    <span>Mar</span>
-                    <span>Mié</span>
-                    <span>Jue</span>
-                    <span>Vie</span>
-                    <span>Sáb</span>
-                    <span>Dom</span>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-[#6b6764]">Hasta</label>
+                    <input
+                      type="date"
+                      value={filterTo}
+                      onChange={(e) => { setFilterTo(e.target.value); setQuickRange('custom'); }}
+                      className="p-2.5 sm:p-3 border border-[#f9cee3] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center">
-                    {calendarDays.map((day, idx) => {
-                      if (!day) return <div key={`empty-${idx}`} className="h-10 sm:h-11"></div>;
-
-                      let bgClass = "bg-white hover:bg-[#fce3ed]/50 text-[#1e1e1c] border-[#fce3ed]";
-                      if (day.isSelectedStart || day.isSelectedEnd) {
-                        bgClass = "bg-[#ec71a8] text-white font-black shadow-md shadow-[#ec71a8]/30";
-                      } else if (day.isInRange) {
-                        bgClass = "bg-[#fce3ed] text-[#ec71a8] font-bold border-[#f9cee3]";
-                      }
-
-                      return (
+                  <div className="flex flex-col gap-1 col-span-2 lg:col-span-1">
+                    <label className="text-[11px] font-bold text-[#6b6764]">Servicio</label>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8c8884]" />
+                      <input
+                        type="text"
+                        placeholder="Nombre del servicio"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-9 p-2.5 sm:p-3 border border-[#f9cee3] rounded-xl text-xs sm:text-sm font-semibold outline-none bg-white focus:border-[#ec71a8]"
+                      />
+                      {searchTerm && (
                         <button
-                          key={day.dateStr}
-                          onClick={() => handleCalendarDayClick(day.dateStr)}
-                          className={`h-10 sm:h-11 rounded-xl border flex flex-col items-center justify-center relative transition-all cursor-pointer text-xs sm:text-sm ${bgClass}`}
+                          onClick={() => setSearchTerm('')}
+                          aria-label="Borrar búsqueda"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8c8884] hover:text-[#1e1e1c] text-xs font-bold cursor-pointer"
                         >
-                          <span>{day.dayNumber}</span>
-                          {day.hasServices && (
-                            <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                              day.isSelectedStart || day.isSelectedEnd ? 'bg-white' : 'bg-[#ec71a8]'
-                            }`}></span>
-                          )}
+                          ✕
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
             </section>
 
-            {/* METRICAS TOTALES FILTRADAS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-[#8c8884] uppercase">Mi Ganancia Filtrada</div>
-                  <div className="text-2xl font-black text-[#ec71a8]">
-                    S/ {reportTotalMyGain.toFixed(2)}
+            {/* METRICAS FILTRADAS (solo cuando hay un filtro aplicado) */}
+            {hasActiveFilters ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 animate-modal">
+                <div className="card-luxury rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-bold text-[#8c8884] uppercase">Mi Ganancia Filtrada</div>
+                    <div className="text-xl sm:text-2xl font-black text-[#ec71a8] whitespace-nowrap">
+                      S/ {reportTotalMyGain.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="text-[10px] sm:text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-2.5 py-1.5 rounded-xl whitespace-nowrap shrink-0">
+                    {filteredServices.length} serv.
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-[#fce3ed] text-[#ec71a8] px-3 py-1.5 rounded-xl">
-                  {filteredServices.length} servicios
-                </div>
-              </div>
 
-              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-[#8c8884] uppercase">Ganancia Salón Filtrada</div>
-                  <div className="text-2xl font-black text-[#1e1e1c]">
-                    S/ {reportTotalSalonGain.toFixed(2)}
+                <div className="card-luxury rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-bold text-[#8c8884] uppercase">Ganancia Salón Filtrada</div>
+                    <div className="text-xl sm:text-2xl font-black text-[#1e1e1c] whitespace-nowrap">
+                      S/ {reportTotalSalonGain.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="text-[10px] sm:text-xs font-bold bg-[#fdebdd] text-[#b8860b] px-2.5 py-1.5 rounded-xl shrink-0">
+                    Salón
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-[#fdebdd] text-[#b8860b] px-3 py-1.5 rounded-xl">
-                  Salón
-                </div>
-              </div>
 
-              <div className="card-luxury rounded-3xl p-6 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-[#8c8884] uppercase">Facturación Total Filtrada</div>
-                  <div className="text-2xl font-black text-[#b8860b]">
-                    S/ {reportTotalFacturado.toFixed(2)}
+                <div className="card-luxury rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-bold text-[#8c8884] uppercase">Facturación Total Filtrada</div>
+                    <div className="text-xl sm:text-2xl font-black text-[#b8860b] whitespace-nowrap">
+                      S/ {reportTotalFacturado.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="text-[10px] sm:text-xs font-bold bg-[#f5f3ef] text-[#6b6764] px-2.5 py-1.5 rounded-xl shrink-0">
+                    Bruto
                   </div>
                 </div>
-                <div className="text-xs font-bold bg-[#f5f3ef] text-[#6b6764] px-3 py-1.5 rounded-xl">
-                  Bruto Total
-                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2.5 bg-white/80 border border-[#fce3ed] rounded-2xl px-3.5 py-3">
+                <Filter className="w-4 h-4 text-[#ec71a8] shrink-0" />
+                <p className="text-[11px] sm:text-xs font-semibold text-[#8c8884]">
+                  Aplica un rango de fechas, un salón o una búsqueda para ver tus métricas filtradas.
+                </p>
+              </div>
+            )}
 
             {/* TABLA PRINCIPAL DE HISTORIAL CON BOTÓN DE EDITAR AL COSTADO DE ELIMINAR */}
-            <section className="card-luxury rounded-3xl p-6 sm:p-8">
+            <section className="card-luxury rounded-3xl p-4 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h3 className="text-xl sm:text-2xl font-extrabold text-[#1e1e1c]">
@@ -2095,35 +2165,35 @@ export default function App() {
                 <table className="w-full text-left border-collapse min-w-[750px]">
                   <thead>
                     <tr className="bg-[#1e1e1c] text-white text-xs font-black uppercase tracking-wider">
-                      <th className="p-4">Fecha</th>
-                      <th className="p-4">Semana</th>
-                      <th className="p-4">Servicio</th>
-                      <th className="p-4">Salón</th>
-                      <th className="p-4">Precio Total</th>
-                      <th className="p-4">Comisión</th>
-                      <th className="p-4">Mi Ganancia</th>
-                      <th className="p-4">Ganancia Salón</th>
-                      <th className="p-4 text-center">Acciones</th>
+                      <th className="p-3 sm:p-4">Fecha</th>
+                      <th className="p-3 sm:p-4">Semana</th>
+                      <th className="p-3 sm:p-4">Servicio</th>
+                      <th className="p-3 sm:p-4">Salón</th>
+                      <th className="p-3 sm:p-4">Precio Total</th>
+                      <th className="p-3 sm:p-4">Comisión</th>
+                      <th className="p-3 sm:p-4">Mi Ganancia</th>
+                      <th className="p-3 sm:p-4">Ganancia Salón</th>
+                      <th className="p-3 sm:p-4 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#fce3ed] text-sm bg-white">
                     {paginatedServices.length > 0 ? (
                       paginatedServices.map((item) => (
                         <tr key={item.id} className="hover:bg-[#fff5f8] transition-colors">
-                          <td className="p-4 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
-                          <td className="p-4 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
-                          <td className="p-4 whitespace-nowrap font-extrabold text-[#1e1e1c]">
+                          <td className="p-3 sm:p-4 whitespace-nowrap font-bold text-[#1e1e1c]">{item.date}</td>
+                          <td className="p-3 sm:p-4 whitespace-nowrap text-[#8c8884] font-semibold">{item.week}</td>
+                          <td className="p-3 sm:p-4 whitespace-nowrap font-extrabold text-[#1e1e1c]">
                             {item.service}
                           </td>
-                          <td className="p-4 whitespace-nowrap">
+                          <td className="p-3 sm:p-4 whitespace-nowrap">
                             <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#f5f3ef] text-[#6b6764] border border-[#e5e1da]">
                               {salonNombre(item.salon_id)}
                             </span>
                           </td>
-                          <td className="p-4 whitespace-nowrap font-bold text-[#1e1e1c]">
+                          <td className="p-3 sm:p-4 whitespace-nowrap font-bold text-[#1e1e1c]">
                             S/ {item.price.toFixed(2)}
                           </td>
-                          <td className="p-4 whitespace-nowrap">
+                          <td className="p-3 sm:p-4 whitespace-nowrap">
                             <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
                               item.commission === 40
                                 ? 'bg-[#fce3ed] text-[#ec71a8] border-[#f9cee3]'
@@ -2132,13 +2202,13 @@ export default function App() {
                               {item.commission}%
                             </span>
                           </td>
-                          <td className="p-4 whitespace-nowrap font-black text-[#ec71a8] text-base">
+                          <td className="p-3 sm:p-4 whitespace-nowrap font-black text-[#ec71a8] text-base">
                             S/ {item.myGain.toFixed(2)}
                           </td>
-                          <td className="p-4 whitespace-nowrap font-semibold text-[#6b6764]">
+                          <td className="p-3 sm:p-4 whitespace-nowrap font-semibold text-[#6b6764]">
                             S/ {item.salongain.toFixed(2)}
                           </td>
-                          <td className="p-4 whitespace-nowrap text-center">
+                          <td className="p-3 sm:p-4 whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
                               
                               {/* BOTÓN DE EDITAR (AL COSTADO DEL BOTÓN DE ELIMINAR) */}
@@ -2296,22 +2366,32 @@ export default function App() {
 
       
         {activeTab === 'productos' && (
-          <section className="flex flex-col gap-6 animate-modal">
-            {/* Formulario de registro */}
-            <div className="card-luxury rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] flex items-center justify-center shadow-md shadow-[#ec71a8]/25">
-                  <PlusCircle className="w-5 h-5 text-white" />
+          <section className="flex flex-col gap-6">
+            {/* Formulario de registro (en móvil se abre con el FAB "Producto") */}
+            <div ref={productFormRef} className={`card-luxury rounded-3xl p-4 sm:p-8 bg-white/95 scroll-mt-24 ${showProductForm ? 'block' : 'hidden lg:block'}`}>
+              <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] flex items-center justify-center shadow-md shadow-[#ec71a8]/25 shrink-0">
+                    <PlusCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-extrabold text-[#1e1e1c]">Registrar Producto</h3>
+                    <p className="text-[11px] sm:text-xs text-[#6b6764] font-medium">Añade maquillaje o insumos al inventario</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-extrabold text-[#1e1e1c]">Registrar Producto / Insumo</h3>
-                  <p className="text-xs text-[#6b6764] font-medium">Añade maquillaje o insumos al inventario</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProductForm(false)}
+                  aria-label="Cerrar formulario de producto"
+                  className="lg:hidden p-2 rounded-xl bg-[#fce3ed] text-[#8c8884] hover:text-[#1e1e1c] cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
               <form onSubmit={handleCreateProduct} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <Tag className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Nombre del producto
                   </label>
@@ -2320,27 +2400,29 @@ export default function App() {
                     value={prodName}
                     onChange={(e) => setProdName(e.target.value)}
                     placeholder="Ej: Pestañina Maybelline"
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                     required
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <Package className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Cantidad
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    value={prodQuantity}
-                    onChange={(e) => setProdQuantity(Number(e.target.value) || 1)}
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    value={1}
+                    disabled
+                    readOnly
+                    aria-label="Cantidad fija: 1 unidad"
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold bg-[#fce3ed]/50 text-[#8c8884] cursor-not-allowed outline-none"
                   />
+                  <span className="text-[10px] font-semibold text-[#8c8884]">Stock unitario · 1 por producto</span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Precio / Costo (S/)
                   </label>
@@ -2351,26 +2433,26 @@ export default function App() {
                     value={prodPrice}
                     onChange={(e) => setProdPrice(e.target.value)}
                     placeholder="0.00"
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <CalendarIcon className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Fecha de compra
                   </label>
                   <input
                     type="date"
                     value={prodPurchaseDate}
-                    onChange={(e) => setProdPurchaseDate(e.target.value)}
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    onChange={(e) => handlePurchaseDateChange(e.target.value)}
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                     required
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <CalendarCheck className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Fecha de apertura <span className="text-[#8c8884] normal-case font-medium">(opcional)</span>
                   </label>
@@ -2378,22 +2460,41 @@ export default function App() {
                     type="date"
                     value={prodStartDate}
                     onChange={(e) => setProdStartDate(e.target.value)}
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#ec71a8]" />
+                    Caducidad
+                  </label>
+                  <BrandSelect
+                    value={prodExpiryPreset}
+                    onChange={handleExpiryPresetChange}
+                    options={[
+                      { value: '6', label: '6 meses', desc: 'Caducidad automática' },
+                      { value: '12', label: '12 meses', desc: 'Caducidad automática' },
+                      { value: '', label: 'Personalizada', desc: 'Elegir la fecha a mano' },
+                    ]}
+                    placeholder="Elegir duración"
+                    icon={Clock}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#4a4744] flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-[#ec71a8]" />
                     Fecha de caducidad
                   </label>
                   <input
                     type="date"
                     value={prodExpirationDate}
-                    onChange={(e) => setProdExpirationDate(e.target.value)}
-                    className="p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
+                    onChange={(e) => { setProdExpirationDate(e.target.value); setProdExpiryPreset(''); }}
+                    className="p-3 sm:p-3.5 border border-[#f9cee3] rounded-2xl text-sm font-bold outline-none focus:border-[#ec71a8] focus:ring-2 focus:ring-[#ec71a8]/15 bg-[#faf5f8]"
                     required
                   />
+                  <span className="text-[10px] font-semibold text-[#8c8884]">Se calcula sola con 6 o 12 meses</span>
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-3 flex justify-end pt-2">
@@ -2409,7 +2510,7 @@ export default function App() {
             </div>
 
             {/* Buscador + listado */}
-            <div className="card-luxury rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm">
+            <div className="card-luxury rounded-3xl p-4 sm:p-8 bg-white/90 backdrop-blur-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[#fce3ed] flex items-center justify-center">
@@ -2591,9 +2692,9 @@ export default function App() {
 
 </main>
 
-      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (FAB central) ================= */}
+      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (3 pestañas + FAB flotante) ================= */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)] pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4 items-end">
+        <div className="grid grid-cols-3 items-end">
           <button
             onClick={() => setActiveTab('resumen')}
             aria-label="Resumen general"
@@ -2602,19 +2703,6 @@ export default function App() {
             <LayoutDashboard className="w-5 h-5" />
             <span className="text-[10px] font-bold">Resumen</span>
           </button>
-
-          {/* FAB: abre el formulario de registro de servicio desde cualquier pantalla */}
-          <button
-            onClick={openRegistro}
-            aria-label="Registrar nuevo servicio"
-            className="relative flex flex-col items-center justify-center gap-1 py-2.5 cursor-pointer"
-          >
-            <div className={`-mt-5 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white transition-transform duration-200 active:scale-95 ${activeTab === 'nuevo_servicio' ? 'scale-105' : ''}`}>
-              <Plus className="w-6 h-6" strokeWidth={3} />
-            </div>
-            <span className={`text-[10px] font-bold ${activeTab === 'nuevo_servicio' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}>Registrar</span>
-          </button>
-
           <button
             onClick={() => setActiveTab('productos')}
             aria-label="Mis productos"
@@ -2633,6 +2721,36 @@ export default function App() {
           </button>
         </div>
       </nav>
+
+      {/* ================= FAB: REGISTRAR SERVICIO (móvil, centrado sobre la barra) ================= */}
+      {/* Se oculta dentro del propio formulario de registro para no tapar los campos */}
+      {activeTab !== 'nuevo_servicio' && (
+        <button
+          onClick={openRegistro}
+          aria-label="Registrar nuevo servicio"
+          title="Registrar servicio"
+          className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white transition-transform duration-200 active:scale-95"
+        >
+          <Plus className="w-6 h-6" strokeWidth={3} />
+        </button>
+      )}
+
+      {/* ================= FAB: REGISTRAR PRODUCTO (móvil, dentro del módulo Productos) ================= */}
+      {activeTab === 'productos' && !showProductForm && (
+        <button
+          onClick={() => {
+            setShowProductForm(true);
+            setTimeout(() => {
+              if (productFormRef.current) productFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 80);
+          }}
+          aria-label="Registrar producto"
+          className="md:hidden fixed right-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-1.5 pl-3 pr-4 py-3 rounded-full bg-[#1e1e1c] text-[#ecc880] font-extrabold text-xs shadow-lg shadow-black/25 ring-2 ring-white/70 active:scale-95"
+        >
+          <Plus className="w-4 h-4" strokeWidth={3} />
+          Producto
+        </button>
+      )}
 
       {/* ================= MODAL INTERACTIVO DE EDICIÓN DE SERVICIO ================= */}
       {editingService && (

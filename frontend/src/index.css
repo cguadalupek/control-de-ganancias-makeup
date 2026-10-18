@@ -4,20 +4,20 @@
 
 @layer base {
   :root {
-    --brand-pink: #ec71a8;
-    --brand-pink-hover: #d95392;
-    --brand-pastel: #f9cee3;
-    --brand-blush: #fce3ed;
-    --brand-cream: #fdebdd;
-    --brand-dark: #1e1e1c;
-    --brand-gold-1: #ecc880;
-    --brand-gold-2: #d4af37;
-    --brand-gold-3: #aa7c11;
+    --brand-berry: #b64a83;
+    --brand-berry-hover: #933a69;
+    --brand-mauve: #efd3e4;
+    --brand-blush: #f6e3f0;
+    --brand-cream: #f6e9df;
+    --brand-dark: #2a1a25;
+    --brand-champagne-1: #eec9a3;
+    --brand-champagne-2: #c89b6b;
+    --brand-bronze: #8a5a3e;
   }
 
   body {
-    background-color: #faf5f8;
-    color: #1e1e1c;
+    background-color: #faf4f8;
+    color: #2a1a25;
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
@@ -33,12 +33,12 @@
     font-family: 'Playfair Display', serif;
   }
 
-  /* Selects con apariencia de marca (chevron rosa, sin flecha nativa) */
+  /* Selects con apariencia de marca (chevron berry, sin flecha nativa) */
   .select-brand {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ec71a8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b64a83' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.9rem center;
     background-size: 1rem;
@@ -53,49 +53,57 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #fdf2f7;
+  background: #f7ecf4;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #f4b6d4;
+  background: #e3b7d0;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ec71a8;
+  background: #b64a83;
 }
 
 /* Gradient accents */
 .bg-gradient-gold {
-  background: linear-gradient(135deg, #f7dfa5 0%, #d4af37 50%, #b8860b 100%);
+  background: linear-gradient(135deg, #eec9a3 0%, #c89b6b 50%, #8a5a3e 100%);
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #dfb15b 0%, #b8860b 100%);
+  background: linear-gradient(135deg, #d0a26e 0%, #7d4e32 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .bg-gradient-rose {
-  background: linear-gradient(135deg, #ec71a8 0%, #e04b8f 100%);
+  background: linear-gradient(135deg, #b64a83 0%, #933a69 100%);
 }
 
 .bg-gradient-luxury-dark {
-  background: linear-gradient(135deg, #2b2b29 0%, #1e1e1c 100%);
+  background: linear-gradient(135deg, #3c2a34 0%, #2a1a25 100%);
 }
 
 .card-luxury {
   background: #ffffff;
-  border: 1px solid rgba(236, 113, 168, 0.2);
-  box-shadow: 0 10px 25px -5px rgba(236, 113, 168, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(182, 74, 131, 0.18);
+  box-shadow: 0 10px 25px -5px rgba(182, 74, 131, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card-luxury:hover {
-  border-color: rgba(236, 113, 168, 0.4);
-  box-shadow: 0 20px 30px -10px rgba(236, 113, 168, 0.15), 0 10px 15px -5px rgba(0, 0, 0, 0.05);
-  transform: translateY(-2px);
+  border-color: rgba(182, 74, 131, 0.38);
+  box-shadow: 0 20px 30px -10px rgba(182, 74, 131, 0.15), 0 10px 15px -5px rgba(0, 0, 0, 0.05);
+}
+
+/* El realce (transform) solo en dispositivos con puntero real: en táctil el :hover se queda
+   "pegado" tras el toque y el transform crea un stacking context que deja los desplegables
+   por debajo del FAB flotante. */
+@media (hover: hover) and (pointer: fine) {
+  .card-luxury:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* Smooth modal backdrop animation */
@@ -117,14 +125,13 @@
 /* Pulse glow for notifications */
 @keyframes goldGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+    box-shadow: 0 0 15px rgba(200, 155, 107, 0.3);
   }
   50% {
-    box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+    box-shadow: 0 0 25px rgba(200, 155, 107, 0.6);
   }
 }
 
 .glow-gold {
   animation: goldGlow 3s infinite ease-in-out;
 }
-
