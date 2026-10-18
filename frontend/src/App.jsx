@@ -717,6 +717,13 @@ export default function App() {
     setSelectedDashboardMonth(cur.getMonth() + 1);
   };
 
+  // Abrir el formulario de registro de servicio desde cualquier pantalla (FAB / barra inferior)
+  const openRegistro = () => {
+    setActiveTab('nuevo_servicio');
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // ==========================================
   // DATOS FILTRADOS PARA EL DASHBOARD MENSUAL
   // ==========================================
@@ -1127,22 +1134,60 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ================= CABECERA MÓVIL ================= */}
-      <div className="md:hidden sticky top-0 z-30 bg-[#faf5f8]/95 backdrop-blur-md border-b border-[#ec71a8]/20 px-4 py-3 flex items-center justify-between">
-        <BrandLogo compact />
-        <span className="text-xs font-extrabold uppercase tracking-widest text-[#ec71a8]">
-          {activeTab === 'resumen' && 'Resumen'}
-          {activeTab === 'nuevo_servicio' && 'Registrar Servicio'}
-          {activeTab === 'productos' && 'Mis Productos'}
-          {activeTab === 'informes' && 'Informes'}
-        </span>
+      {/* ================= CABECERA MÓVIL COMPACTA (logo + selector de mes) ================= */}
+      <div className="md:hidden sticky top-0 z-30 bg-[#faf5f8]/95 backdrop-blur-md border-b border-[#ec71a8]/20 px-3 py-2 flex items-center justify-between gap-2">
+        <button
+          onClick={() => setActiveTab('resumen')}
+          aria-label="Ir al resumen general"
+          className="shrink-0 rounded-2xl cursor-pointer"
+        >
+          <BrandLogo compact />
+        </button>
+
+        {activeTab === 'resumen' ? (
+          /* Selector compacto de mes: < Octubre 2026 > */
+          <div className="flex items-center gap-0.5 bg-white border border-[#f9cee3] rounded-full px-0.5 py-0.5 shadow-xs">
+            <button
+              onClick={handlePrevDashboardMonth}
+              aria-label="Mes anterior"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={isViewingCurrentMonth ? undefined : handleCurrentDashboardMonth}
+              aria-label={isViewingCurrentMonth ? 'Mes en curso' : 'Volver al mes actual'}
+              className={`px-1 min-w-0 text-center ${isViewingCurrentMonth ? '' : 'cursor-pointer'}`}
+            >
+              <span className="block font-extrabold text-xs text-[#1e1e1c] capitalize whitespace-nowrap">
+                {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}
+              </span>
+              <span className={`block text-[9px] font-bold leading-tight ${isViewingCurrentMonth ? 'text-[#8c8884]' : 'text-[#ec71a8]'}`}>
+                {isViewingCurrentMonth ? 'Mes en curso' : 'Volver a hoy'}
+              </span>
+            </button>
+            <button
+              onClick={handleNextDashboardMonth}
+              aria-label="Mes siguiente"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-[#ec71a8] active:bg-[#fce3ed] cursor-pointer shrink-0"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs font-extrabold uppercase tracking-widest text-[#ec71a8] text-right">
+            {activeTab === 'nuevo_servicio' && 'Registrar Servicio'}
+            {activeTab === 'productos' && 'Mis Productos'}
+            {activeTab === 'informes' && 'Informes'}
+          </span>
+        )}
       </div>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 p-4 sm:p-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-8 overflow-y-auto">
+      <main className="flex-1 px-3 py-4 sm:p-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto flex flex-col gap-4 sm:gap-8 overflow-y-auto">
 
         {/* HEADER DE BIENVENIDA Y CONTROL DE MES */}
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-3xl p-6 sm:p-7 shadow-sm">
+        <header className="hidden md:flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/90 backdrop-blur-sm border border-[#ec71a8]/20 rounded-3xl p-6 sm:p-7 shadow-sm">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#ec71a8] mb-1">
               <Sparkles className="w-3.5 h-3.5" />
@@ -1213,83 +1258,83 @@ export default function App() {
 
         {/* ================= VISTA 1: RESUMEN GENERAL (REINICIO A CERO CADA MES) ================= */}
         {activeTab === 'resumen' && (
-          <div className="flex flex-col gap-8 animate-in fade-in duration-300">
+          <div className="flex flex-col gap-4 sm:gap-8 animate-in fade-in duration-300">
             
-            {/* TARJETAS PRINCIPALES DEL MES */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* TARJETAS PRINCIPALES DEL MES — grid compacto de 2 columnas en móvil */}
+            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3">
               
-              {/* 1. MI GANANCIA NETA DEL MES */}
-              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
+              {/* 1. MI GANANCIA NETA DEL MES (destacada, ancho completo en móvil) */}
+              <div className="card-luxury rounded-3xl p-4 sm:p-6 relative overflow-hidden flex flex-col justify-between min-[360px]:col-span-2 lg:col-span-1">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#ec71a8]/15 to-transparent rounded-full blur-2xl"></div>
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#ec71a8] bg-[#fce3ed] px-3 py-1 rounded-lg border border-[#f9cee3]">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="min-w-0 leading-tight text-[10px] sm:text-xs font-extrabold uppercase tracking-normal sm:tracking-wider text-[#ec71a8] bg-[#fce3ed] px-2 sm:px-2.5 py-1 rounded-lg border border-[#f9cee3]">
                     Mi Ganancia Neta
                   </span>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/30">
-                    <DollarSign className="w-5 h-5 stroke-[2.5]" />
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/30 shrink-0">
+                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
                   </div>
                 </div>
-                <div className="mt-5">
-                  <div className="text-4xl sm:text-5xl font-black text-[#1e1e1c] tracking-tight">
+                <div className="mt-3 sm:mt-5">
+                  <div className="text-3xl sm:text-5xl font-black text-[#1e1e1c] tracking-tight whitespace-nowrap">
                     S/ {monthMyGain.toFixed(2)}
                   </div>
-                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ec71a8]"></span>
-                    {monthGoalProgressPct}% alcanzado de la meta mensual
+                  <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764] flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ec71a8] shrink-0"></span>
+                    {monthGoalProgressPct}% de la meta mensual
                   </div>
                 </div>
               </div>
 
               {/* 3. TOTAL FACTURADO EN EL MES */}
-              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#b8860b] bg-[#fdebdd] px-3 py-1 rounded-lg border border-[#edd5b6]">
+              <div className="card-luxury rounded-3xl p-4 sm:p-6 relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="min-w-0 leading-tight text-[10px] sm:text-xs font-extrabold uppercase tracking-normal sm:tracking-wider text-[#b8860b] bg-[#fdebdd] px-2 sm:px-2.5 py-1 rounded-lg border border-[#edd5b6]">
                     Total Facturado
                   </span>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-gold text-white flex items-center justify-center shadow-md shadow-[#d4af37]/30">
-                    <TrendingUp className="w-5 h-5 stroke-[2.5]" />
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-gold text-white flex items-center justify-center shadow-md shadow-[#d4af37]/30 shrink-0">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
                   </div>
                 </div>
-                <div className="mt-5">
-                  <div className="text-3xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight">
+                <div className="mt-3 sm:mt-5">
+                  <div className="text-xl sm:text-4xl font-extrabold text-[#1e1e1c] tracking-tight whitespace-nowrap">
                     S/ {monthFacturado.toFixed(2)}
                   </div>
-                  <div className="mt-2.5 text-xs font-semibold text-[#6b6764]">
+                  <div className="mt-2 text-[11px] sm:text-xs font-semibold text-[#6b6764]">
                     {monthlyServices.length} {monthlyServices.length === 1 ? 'servicio en el mes' : 'servicios en el mes'}
                   </div>
                 </div>
               </div>
 
               {/* 4. META DEL MES CON BARRA DE PROGRESO */}
-              <div className="card-luxury rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#ec71a8] bg-[#fce3ed] px-3 py-1 rounded-lg border border-[#f9cee3]">
-                    Meta ({monthNames[selectedDashboardMonth - 1]})
+              <div className="card-luxury rounded-3xl p-4 sm:p-6 relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="min-w-0 leading-tight text-[10px] sm:text-xs font-extrabold uppercase tracking-normal sm:tracking-wider text-[#ec71a8] bg-[#fce3ed] px-2 sm:px-2.5 py-1 rounded-lg border border-[#f9cee3]">
+                    Meta<span className="hidden sm:inline"> ({monthNames[selectedDashboardMonth - 1]})</span>
                   </span>
-                  <div className="w-11 h-11 rounded-2xl bg-[#fdebdd] border border-[#d4af37]/40 text-[#b8860b] flex items-center justify-center">
-                    <Target className="w-5 h-5" />
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-[#fdebdd] border border-[#d4af37]/40 text-[#b8860b] flex items-center justify-center shrink-0">
+                    <Target className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                 </div>
 
-                <div className="mt-5">
-                  <div className="text-2xl sm:text-3xl font-black text-[#1e1e1c]">
+                <div className="mt-3 sm:mt-5">
+                  <div className="text-sm sm:text-3xl font-black text-[#1e1e1c] leading-tight break-words">
                     {monthRemainingGoal > 0 ? (
                       <span>Faltan S/ {monthRemainingGoal.toFixed(2)}</span>
                     ) : (
-                      <span className="text-[#ec71a8] flex items-center gap-1.5">
-                        ¡Meta Cumplida! <Sparkles className="w-5 h-5 text-[#ecc880]" />
+                      <span className="text-[#ec71a8] flex flex-wrap items-center gap-1">
+                        ¡Meta Cumplida! <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#ecc880] shrink-0" />
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-3.5 w-full bg-[#fce3ed] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#f9cee3]">
+                  <div className="mt-2.5 sm:mt-3.5 w-full bg-[#fce3ed] h-2.5 sm:h-3.5 rounded-full overflow-hidden p-0.5 border border-[#f9cee3]">
                     <div 
                       className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#d4af37] via-[#ec71a8] to-[#d95392]"
                       style={{ width: `${monthGoalProgressPct}%` }}
                     ></div>
                   </div>
 
-                  <div className="mt-2 flex justify-between text-[11px] font-bold text-[#8c8884]">
+                  <div className="mt-1.5 sm:mt-2 flex justify-between text-[10px] sm:text-[11px] font-bold text-[#8c8884]">
                     <span>S/ 0.00</span>
                     <span className="text-[#ec71a8] font-extrabold">{monthGoalProgressPct}%</span>
                     <span>S/ {goalAmount.toFixed(0)}</span>
@@ -1300,7 +1345,7 @@ export default function App() {
             </div>
 
             {/* SECCIÓN DINÁMICA: EVOLUCIÓN SEMANAL & DESGLOSE POR COMISIÓN */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               
               {/* RENDIMIENTO SEMANAL (SEMANAS 1 A 5) */}
               <div className="card-luxury rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
@@ -1436,21 +1481,13 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setActiveTab('nuevo_servicio')}
-                  className="mt-6 w-full py-3 rounded-2xl bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-[#ec71a8]/25 hover:opacity-95 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  Registrar Servicio en este Mes
-                </button>
               </div>
 
             </div>
 
             {/* TABLA DE ÚLTIMO SERVICIO REGISTRADO DEL MES (SOLO 1 REGISTRO, EL MÁS ACTUAL) */}
-            <div className="card-luxury rounded-3xl p-6 sm:p-7">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="card-luxury rounded-3xl p-4 sm:p-7">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg sm:text-xl font-extrabold text-[#1e1e1c]">
@@ -1549,12 +1586,9 @@ export default function App() {
                             <p className="text-xs text-[#8c8884]">
                               El panel inicia en 0.00 al comenzar cada nuevo mes.
                             </p>
-                            <button
-                              onClick={() => setActiveTab('nuevo_servicio')}
-                              className="mt-2 text-xs text-white bg-[#ec71a8] px-4 py-2 rounded-xl font-bold hover:bg-[#d95392] cursor-pointer shadow-sm"
-                            >
-                              + Registrar Primer Servicio de Este Mes
-                            </button>
+                            <p className="text-xs font-bold text-[#ec71a8]">
+                              Usa el botón + de la barra inferior para registrar un servicio.
+                            </p>
                           </div>
                         </td>
                       </tr>
@@ -1605,6 +1639,7 @@ export default function App() {
                   <div className="rounded-2xl bg-white border border-[#fce3ed] p-6 text-center">
                     <Sparkles className="w-8 h-8 text-[#ec71a8]/40 mx-auto mb-2" />
                     <span className="font-extrabold text-[#1e1e1c] text-sm">No hay servicios registrados en {monthNames[selectedDashboardMonth - 1]} {selectedDashboardYear}.</span>
+                    <p className="text-xs font-bold text-[#ec71a8] mt-1">Usa el botón + de la barra inferior para registrar un servicio.</p>
                   </div>
                 )}
               </div>
@@ -2556,35 +2591,42 @@ export default function App() {
 
 </main>
 
-      {/* ================= NAVEGACIÓN INFERIOR MÓVIL ================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)]">
+      {/* ================= NAVEGACIÓN INFERIOR MÓVIL (FAB central) ================= */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ec71a8]/20 shadow-[0_-4px_20px_rgba(236,113,168,0.10)] pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-4 items-end">
           <button
             onClick={() => setActiveTab('resumen')}
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            aria-label="Resumen general"
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'resumen' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span className="text-[10px] font-bold">Resumen</span>
           </button>
+
+          {/* FAB: abre el formulario de registro de servicio desde cualquier pantalla */}
           <button
-            onClick={() => setActiveTab('nuevo_servicio')}
-            className="flex flex-col items-center justify-center gap-1 py-2.5"
+            onClick={openRegistro}
+            aria-label="Registrar nuevo servicio"
+            className="relative flex flex-col items-center justify-center gap-1 py-2.5 cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-md shadow-[#ec71a8]/30">
-              <Plus className="w-5 h-5" />
+            <div className={`-mt-5 w-14 h-14 rounded-full bg-gradient-to-r from-[#ec71a8] to-[#d95392] text-white flex items-center justify-center shadow-lg shadow-[#ec71a8]/40 ring-4 ring-white transition-transform duration-200 active:scale-95 ${activeTab === 'nuevo_servicio' ? 'scale-105' : ''}`}>
+              <Plus className="w-6 h-6" strokeWidth={3} />
             </div>
             <span className={`text-[10px] font-bold ${activeTab === 'nuevo_servicio' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}>Registrar</span>
           </button>
+
           <button
             onClick={() => setActiveTab('productos')}
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            aria-label="Mis productos"
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'productos' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
           >
             <Package className="w-5 h-5" />
             <span className="text-[10px] font-bold">Productos</span>
           </button>
           <button
             onClick={() => setActiveTab('informes')}
-            className={`flex flex-col items-center justify-center gap-1 py-2.5 ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
+            aria-label="Informes y edición"
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${activeTab === 'informes' ? 'text-[#ec71a8]' : 'text-[#8c8884]'}`}
           >
             <FileText className="w-5 h-5" />
             <span className="text-[10px] font-bold">Informes</span>
