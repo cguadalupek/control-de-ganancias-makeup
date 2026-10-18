@@ -161,15 +161,17 @@ Asegúrate de tener instalados **Docker** y **Docker Compose**.
    - **Aplicación Web:** `http://localhost` (puerto 80)
    - **Documentación API (Swagger):** `http://localhost:8000/docs`
 
-### Producción (LXC `makeup-registros`)
+### Producción (LXC `salon-app`)
 
-- **Host:** `192.168.1.103`, proyecto en `/opt/salon-app`.
-- **Contenedores:** `salon_frontend` (nginx, puerto 80), `salon_backend` (FastAPI, puerto 8000) y `salon_tunnel` (Cloudflare).
+- **Host:** LXC `113` (`salon-app`) en Proxmox VE `192.168.1.210` → **`192.168.1.113`**, proyecto en `/opt/salon-app` (Debian 12, 2 vCPU / 2 GB / 20 GB, `nesting=1`).
+- **Contenedores:** `salon_frontend` (nginx, puerto 80), `salon_backend` (FastAPI, puerto 8000) y `salon_tunnel` (Cloudflare → `https://makeup.kevincarmen.xyz`).
+- **Acceso:** `http://192.168.1.113` en la LAN · `https://makeup.kevincarmen.xyz` desde cualquier lugar.
+- **Host anterior (detenido, solo respaldo):** LXC `103` (`makeup-registros`, `192.168.1.103`) con una copia íntegra del proyecto y de la base de datos. No arrancar su stack mientras el 113 esté en producción: los dos túneles comparten token y Cloudflare repartiría el tráfico entre versiones distintas.
 - **Actualizar solo la interfaz** (lo habitual al tocar `frontend/`):
   ```bash
   # desde el repo local, subir el archivo y reconstruir solo el frontend
-  plink root@192.168.1.103 "cat > /opt/salon-app/frontend/src/App.jsx" < frontend/src/App.jsx
-  plink root@192.168.1.103 "cd /opt/salon-app && docker-compose up -d --build frontend"
+  plink root@192.168.1.113 "cat > /opt/salon-app/frontend/src/App.jsx" < frontend/src/App.jsx
+  plink root@192.168.1.113 "cd /opt/salon-app && docker-compose up -d --build frontend"
   ```
   El `frontend/Dockerfile` hace `npm install` + `npm run build` **dentro** del contenedor (el host no tiene Node).
 - **Reconstruir todo:** `docker-compose up -d --build` en `/opt/salon-app`.
